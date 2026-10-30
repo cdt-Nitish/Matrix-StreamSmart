@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { HardDrive, PieChart } from 'lucide-react';
 import { buildCacheDoughnutData, getDoughnutOptions } from '../../utils/chartController';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -19,37 +20,41 @@ export default function CacheEfficiencyChart({ hits = 0, misses = 0 }) {
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title-lg">Edge Cache Efficiency</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <HardDrive size={18} color="var(--primary)" />
+          <div className="card-title-lg">Edge Cache Efficiency</div>
+        </div>
         <span className="simulated-tag">SIMULATED</span>
       </div>
-      <div className="chart-container" style={{height:'160px'}}>
-        {total > 0
-          ? <Doughnut data={data} options={options} />
-          : (
-            <div className="empty-state" style={{height:'100%'}}>
-              <div className="empty-state-icon">🗄️</div>
-              <div className="empty-state-sub">No cache data yet</div>
-            </div>
-          )}
+      <div className="chart-container" style={{ height: '170px' }}>
+        {total > 0 ? (
+          <Doughnut data={data} options={options} />
+        ) : (
+          <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
+            <PieChart size={32} color="var(--text-muted)" style={{ margin: '0 auto 8px' }} />
+            <div className="empty-state-sub">Awaiting cache segment fetches...</div>
+          </div>
+        )}
       </div>
-      <div style={{marginTop:'12px', display:'flex', flexDirection:'column', gap:'6px'}}>
-        <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px'}}>
-          <span style={{color:'var(--text-muted)'}}>Hit Rate</span>
-          <span style={{color:'var(--accent-green)', fontWeight:700}}>{hitPct}%</span>
+      <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Cache Hit Ratio</span>
+          <span style={{ color: 'var(--success)', fontWeight: 700 }}>{hitPct}%</span>
         </div>
-        <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px'}}>
-          <span style={{color:'var(--text-muted)'}}>Hits / Misses</span>
-          <span style={{color:'var(--text-secondary)'}}>{hits} / {misses}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Hits vs Origin Misses</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{hits} / {misses}</span>
         </div>
-        <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px'}}>
-          <span style={{color:'var(--text-muted)'}}>Est. Latency Saved</span>
-          <span style={{color:'var(--accent-cyan)', fontWeight:600}}>{savedMs > 0 ? `${savedMs} ms` : '--'}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Latency Preserved</span>
+          <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+            {savedMs > 0 ? `${savedMs.toLocaleString()} ms` : '0 ms'}
+          </span>
         </div>
-        <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px', fontStyle:'italic'}}>
-          ※ Simulated values (12ms hit / 260ms miss)
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+          Simulated edge latency: 12ms POP hit / 260ms Origin miss
         </div>
       </div>
     </div>
   );
 }
-

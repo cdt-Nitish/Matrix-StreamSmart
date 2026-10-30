@@ -5,6 +5,7 @@ import {
   CategoryScale, LinearScale, BarElement,
   Title, Tooltip, Legend
 } from 'chart.js';
+import { BarChart3 } from 'lucide-react';
 import { buildComparisonBarData, getBarOptions } from '../../utils/chartController';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -18,23 +19,25 @@ export default function PerformanceBarChart({ baselineMetrics, optimizedMetrics 
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title-lg">Performance Comparison</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <BarChart3 size={18} color="var(--primary)" />
+          <div className="card-title-lg">Comparative Benchmark</div>
+        </div>
       </div>
-      <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'12px'}}>
-        Startup delay · Rebuffering · Interruptions
+      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+        Side-by-side QoS comparison: Startup Delay (ms) · Rebuffer Duration (s) · Stalls
       </div>
       <div className="chart-container">
-        {hasData
-          ? <Bar data={data} options={options} />
-          : (
-            <div className="empty-state">
-              <div className="empty-state-icon">📊</div>
-              <div className="empty-state-text">No data yet</div>
-              <div className="empty-state-sub">Run a benchmark to compare players</div>
-            </div>
-          )}
+        {hasData ? (
+          <Bar data={data} options={options} />
+        ) : (
+          <div className="empty-state">
+            <BarChart3 size={36} color="var(--text-muted)" style={{ margin: '0 auto 8px' }} />
+            <div className="empty-state-text">No Benchmark Run Recorded</div>
+            <div className="empty-state-sub">Launch playback across both players to capture comparative QoS deltas</div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-

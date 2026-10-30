@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Settings, ChevronDown, Check, Sparkles } from 'lucide-react';
 
 /**
- * YouTubeQualitySelector – YouTube-style Quality Settings Menu
+ * YouTubeQualitySelector – Clean SaaS Quality Settings Menu
  *
- * Provides a gear settings button (⚙️) with a popover menu showing
+ * Provides a gear settings button with a popover menu showing
  * all available video quality renditions parsed from the HLS stream,
  * complete with checkmark indicators and HD badges.
  */
@@ -66,85 +67,98 @@ export default function YouTubeQualitySelector({
   };
 
   return (
-    <div className="yt-quality-container" ref={popoverRef}>
+    <div className="yt-quality-selector-wrap" ref={popoverRef}>
       <button
         type="button"
         className={`yt-quality-btn ${isOpen ? 'active' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
-        title="Change video quality (YouTube style)"
+        title="Select stream rendition quality"
       >
-        <span className="yt-gear-icon">⚙️</span>
-        <span className="yt-quality-btn-text">{buttonLabel}</span>
-        <span className="yt-caret">▾</span>
+        <Settings size={13} />
+        <span>{buttonLabel}</span>
+        <ChevronDown size={12} />
       </button>
 
       {isOpen && (
         <div className="yt-quality-popover">
           <div className="yt-popover-header">
-            <span style={{fontSize:'12px', fontWeight:600}}>⚙️ Quality for this player</span>
-            <span style={{fontSize:'10px', color:'var(--text-muted)'}}>{playerType}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Settings size={13} />
+              <span>Quality Settings</span>
+            </span>
+            <span className="chip chip-blue" style={{ fontSize: '10px', padding: '1px 5px' }}>{playerType}</span>
           </div>
 
-          <div className="yt-popover-body">
+          <div className="yt-popover-list">
             {allowAuto && (
-              <button
-                type="button"
-                className={`yt-quality-item ${isAuto ? 'selected' : ''}`}
+              <div
+                className={`yt-quality-item ${isAuto ? 'active' : ''}`}
                 onClick={() => handleSelect(-1)}
               >
-                <span className="yt-item-check">{isAuto ? '✓' : ''}</span>
-                <div className="yt-item-content">
-                  <span className="yt-item-title">
-                    Auto <span className="yt-auto-tag">Recommended</span>
-                  </span>
-                  <span className="yt-item-sub">
-                    Adapts to buffer & bandwidth in real time
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                    {isAuto && <Check size={14} color="var(--primary-blue)" strokeWidth={2.5} />}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: isAuto ? 700 : 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Auto</span>
+                      <span className="chip chip-green" style={{ fontSize: '9px', padding: '0 4px' }}>Recommended</span>
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      Adaptive Bitrate heuristic
+                    </div>
+                  </div>
                 </div>
-              </button>
+              </div>
             )}
 
-            <div className="yt-popover-divider" />
-            <div className="yt-popover-section-label">SELECT SPECIFIC RESOLUTION</div>
+            <div style={{ padding: '6px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Fixed Renditions
+            </div>
 
             {parsedLevels.map((lvl) => {
               const isSelected = !isAuto && (
                 currentLevelIndex === lvl.index ||
-                activeResolution.startsWith(`${lvl.height}p`)
+                activeResolution.includes(`${lvl.height}p`)
               );
 
               return (
-                <button
+                <div
                   key={lvl.index}
-                  type="button"
-                  className={`yt-quality-item ${isSelected ? 'selected' : ''}`}
+                  className={`yt-quality-item ${isSelected ? 'active' : ''}`}
                   onClick={() => handleSelect(lvl.index)}
                 >
-                  <span className="yt-item-check">{isSelected ? '✓' : ''}</span>
-                  <div className="yt-item-content">
-                    <span className="yt-item-title">
-                      {lvl.label}
-                      {lvl.isHD && <span className="yt-hd-badge">HD</span>}
-                    </span>
-                    {lvl.bitrateKbps > 0 && (
-                      <span className="yt-item-sub">
-                        ~{lvl.bitrateKbps >= 1000 ? `${(lvl.bitrateKbps / 1000).toFixed(1)} Mbps` : `${lvl.bitrateKbps} Kbps`}
-                      </span>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                      {isSelected && <Check size={14} color="var(--primary-blue)" strokeWidth={2.5} />}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: isSelected ? 700 : 500 }}>{lvl.label}</span>
+                      {lvl.isHD && (
+                        <span className="chip chip-blue" style={{ fontSize: '9px', padding: '0 4px', fontWeight: 700 }}>
+                          HD
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </button>
+
+                  {lvl.bitrateKbps > 0 && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                      ~{lvl.bitrateKbps}k
+                    </span>
+                  )}
+                </div>
               );
             })}
           </div>
 
           <div className="yt-popover-footer">
-            {playerType === 'BASELINE'
-              ? 'Fixed quality demonstrates network constraint effects'
-              : 'Auto mode utilizes the custom 3-rule ABR algorithm'}
+            {allowAuto
+              ? 'ABR dynamically adjusts quality to eliminate buffering.'
+              : 'Fixed quality demonstrates stall risks under throttling.'}
           </div>
         </div>
       )}
     </div>
   );
 }
-

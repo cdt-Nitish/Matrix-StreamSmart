@@ -13,6 +13,8 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="workbench" element={<Dashboard />} />
+          <Route path="analytics" element={<ComparisonReport />} />
           <Route path="history" element={<History />} />
           <Route path="report" element={<Navigate to="/report/demo" replace />} />
           <Route path="report/:sessionId" element={<ComparisonReport />} />

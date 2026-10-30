@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
+import { Film, Search, ChevronLeft, ChevronRight, Play, CheckCircle2 } from 'lucide-react';
 
 /**
- * YouTubeVideoRail – YouTube-style Horizontal Scrollable Video Rail
+ * YouTubeVideoRail – SaaS Video Stream Carousel
  *
- * Displays 10+ benchmark video streams with rich thumbnails, duration badges,
+ * Displays benchmark video streams with 16:9 thumbnails, duration badges,
  * resolution tags, category filtering, and smooth horizontal scrolling navigation.
  */
 export default function YouTubeVideoRail({
@@ -31,7 +32,7 @@ export default function YouTubeVideoRail({
 
   const scroll = (direction) => {
     if (trackRef.current) {
-      const scrollAmount = direction === 'left' ? -360 : 360;
+      const scrollAmount = direction === 'left' ? -380 : 380;
       trackRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
@@ -40,32 +41,37 @@ export default function YouTubeVideoRail({
     <div className="yt-video-rail-container">
       {/* ── Header: Title, Category Chips & Search ─────────────────── */}
       <div className="yt-rail-header">
-        <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div className="yt-rail-title">
-            <span style={{color:'var(--accent-red)'}}>▶</span> Video Catalog
+            <Film size={18} color="var(--primary-blue)" />
+            <span>Benchmark Video Catalog</span>
             <span className="yt-count-badge">{videos.length} Streams</span>
           </div>
-          <span style={{fontSize:'12px', color:'var(--text-secondary)'}}>
-            Scroll horizontally to choose any benchmark video
+          <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+            Choose a multi-bitrate HLS stream to compare baseline vs. ABR performance
           </span>
         </div>
 
         {/* Scroll arrows and search */}
-        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-          <input
-            type="text"
-            className="yt-search-input"
-            placeholder="Search streams..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px' }} />
+            <input
+              type="text"
+              className="yt-search-input"
+              style={{ paddingLeft: '30px' }}
+              placeholder="Search streams..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <button
             type="button"
             className="yt-scroll-arrow"
             onClick={() => scroll('left')}
             title="Scroll left"
           >
-            ◀
+            <ChevronLeft size={16} />
           </button>
           <button
             type="button"
@@ -73,7 +79,7 @@ export default function YouTubeVideoRail({
             onClick={() => scroll('right')}
             title="Scroll right"
           >
-            ▶
+            <ChevronRight size={16} />
           </button>
         </div>
       </div>
@@ -92,7 +98,7 @@ export default function YouTubeVideoRail({
         ))}
       </div>
 
-      {/* ── Horizontal Scroll Track (At least 10-12 videos) ─────────── */}
+      {/* ── Horizontal Scroll Track ─────────────────────────────────── */}
       <div className="yt-rail-track" ref={trackRef}>
         {filteredVideos.map((video) => {
           const isSelected = selectedVideo?.video_id === video.video_id;
@@ -101,69 +107,61 @@ export default function YouTubeVideoRail({
             <div
               key={video.video_id}
               className={`yt-video-card ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-              onClick={() => !disabled && onSelectVideo(video)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
-                  onSelectVideo(video);
-                }
-              }}
+              onClick={() => !disabled && onSelectVideo && onSelectVideo(video)}
+              title={disabled ? 'Benchmark running — stream change disabled' : `Select ${video.title}`}
             >
-              {/* Thumbnail Container */}
               <div className="yt-card-thumb-wrap">
                 <img
                   src={video.thumbnail_url || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=480&auto=format&fit=crop&q=80'}
                   alt={video.title}
                   className="yt-card-thumb"
                   loading="lazy"
-                  onError={(e) => {
-                    // Fallback to high-contrast tech gradient thumbnail if image fails
-                    e.currentTarget.style.display = 'none';
-                    if (e.currentTarget.parentElement) {
-                      e.currentTarget.parentElement.style.background = 'linear-gradient(135deg, #0d1e38, #1a3860)';
-                    }
-                  }}
                 />
 
-                {/* Badges on Thumbnail */}
-                <div className="yt-card-badge-top-left">
-                  {video.category || 'General'}
-                </div>
+                {video.category && (
+                  <span className="yt-card-badge-top-left">{video.category}</span>
+                )}
 
-                <div className="yt-card-badge-top-right">
-                  {video.badge || '1080p HD'}
-                </div>
+                {video.badge && (
+                  <span className="yt-card-badge-top-right">{video.badge}</span>
+                )}
 
-                <div className="yt-card-duration">
-                  {video.duration_formatted || `${video.duration_sec || 60}s`}
-                </div>
+                <span className="yt-card-duration">
+                  {video.duration_formatted || '10:00'}
+                </span>
 
-                {/* Hover Play Overlay */}
                 <div className="yt-card-hover-overlay">
-                  <span className="yt-play-icon">▶</span>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'var(--primary-blue)',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                  }}>
+                    <Play size={16} fill="currentColor" />
+                  </div>
                 </div>
 
-                {/* Selected Status Ribbon */}
                 {isSelected && (
                   <div className="yt-card-selected-ribbon">
-                    ✓ ACTIVE BENCHMARK
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={11} /> SELECTED BENCHMARK
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Video Info */}
               <div className="yt-card-info">
-                <div className="yt-card-title" title={video.title}>
-                  {video.title}
-                </div>
+                <div className="yt-card-title">{video.title}</div>
                 <div className="yt-card-tiers">
-                  {video.available_tiers || '240p, 360p, 480p, 720p, 1080p'}
+                  {video.available_tiers || '240p,360p,480p,720p,1080p'}
                 </div>
                 <div className="yt-card-meta">
-                  <span className="text-cyan">HLS .m3u8</span>
-                  <span>•</span>
-                  <span>{video.duration_formatted || `${video.duration_sec}s`}</span>
+                  <span>HLS Stream #{video.video_id}</span>
                 </div>
               </div>
             </div>
@@ -173,4 +171,3 @@ export default function YouTubeVideoRail({
     </div>
   );
 }
-

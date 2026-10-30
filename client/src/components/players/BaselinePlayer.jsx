@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
 import { createBaselinePlayer } from '../../utils/dualPlayer';
 import YouTubeQualitySelector from './YouTubeQualitySelector';
+import { Lock, Sliders } from 'lucide-react';
 
 const BaselinePlayer = forwardRef(function BaselinePlayer(
   { src, networkConfig, onMetrics, sessionId },
@@ -38,7 +39,6 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
   useEffect(() => {
     if (!src || !videoRef.current) return;
 
-    // Destroy any previous player
     if (playerRef.current) {
       playerRef.current.destroy();
       playerRef.current = null;
@@ -85,7 +85,7 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
       <div className="player-header">
         <div className="player-title">
           <span className="player-badge baseline">BASELINE</span>
-          Fixed Quality Baseline
+          <span>Fixed-Quality Player</span>
         </div>
 
         {/* YouTube-style Quality Selector */}
@@ -118,7 +118,36 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
 
         <div className="player-status-indicator">
           <span className={`status-dot ${status}`} />
-          {statusLabel}
+          <span>{statusLabel}</span>
+        </div>
+      </div>
+
+      {/* ── Fixed Quality Status Banner ─────────────────────────────── */}
+      <div style={{
+        padding: '10px 16px',
+        background: 'var(--bg-subtle)',
+        borderTop: '1px solid var(--border)',
+        borderBottom: '1px solid var(--border)',
+        fontSize: '12px',
+        color: 'var(--text-secondary)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Lock size={13} color="#475569" />
+          <span style={{ color: '#0F172A', fontWeight: 600 }}>LOCKED RENDITION:</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary-blue)', fontWeight: 700 }}>
+            {metrics.currentResolution}
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            (Auto-switching disabled)
+          </span>
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          Target: {metrics.currentBitrateKbps > 0 ? `${metrics.currentBitrateKbps} Kbps` : 'Max Available'}
         </div>
       </div>
 
@@ -130,34 +159,34 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
         <div className="player-metric-cell">
           <div className="player-metric-value">
             {metrics.currentBitrateKbps > 0 ? `${metrics.currentBitrateKbps}` : '--'}
-            <span style={{fontSize:'10px',color:'var(--text-muted)'}}> Kbps</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}> Kbps</span>
           </div>
           <div className="player-metric-label">Bitrate</div>
         </div>
         <div className="player-metric-cell">
           <div className="player-metric-value">
             {metrics.currentBufferSec.toFixed(1)}
-            <span style={{fontSize:'10px',color:'var(--text-muted)'}}> s</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}> s</span>
           </div>
           <div className="player-metric-label">Buffer</div>
         </div>
         <div className="player-metric-cell">
           <div className="player-metric-value">
             {metrics.startupDelayMs > 0 ? (metrics.startupDelayMs / 1000).toFixed(2) : '--'}
-            <span style={{fontSize:'10px',color:'var(--text-muted)'}}> s</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}> s</span>
           </div>
           <div className="player-metric-label">Startup Delay</div>
         </div>
         <div className="player-metric-cell">
-          <div className="player-metric-value" style={{color: metrics.stallCount > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>
+          <div className="player-metric-value" style={{ color: metrics.stallCount > 0 ? 'var(--error)' : 'inherit' }}>
             {metrics.stallCount}
           </div>
           <div className="player-metric-label">Stalls</div>
         </div>
         <div className="player-metric-cell">
-          <div className="player-metric-value" style={{color: metrics.currentlyStalled ? 'var(--accent-red)' : 'inherit'}}>
+          <div className="player-metric-value" style={{ color: metrics.currentlyStalled ? 'var(--error)' : 'inherit' }}>
             {metrics.totalStallDurationSec.toFixed(1)}
-            <span style={{fontSize:'10px',color:'var(--text-muted)'}}> s</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}> s</span>
           </div>
           <div className="player-metric-label">Rebuffer Time</div>
         </div>
@@ -167,4 +196,3 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
 });
 
 export default BaselinePlayer;
-

@@ -8,6 +8,24 @@ import CacheEfficiencyChart from '../components/charts/CacheEfficiencyChart';
 import YouTubeVideoRail from '../components/workbench/YouTubeVideoRail';
 import useTelemetry from '../hooks/useTelemetry';
 import api from '../services/api';
+import {
+  Activity,
+  Zap,
+  PauseCircle,
+  CheckCircle2,
+  Play,
+  Square,
+  RotateCcw,
+  Sliders,
+  SlidersHorizontal,
+  Film,
+  ArrowRight,
+  Clock,
+  AlertTriangle,
+  Radio,
+  BarChart3,
+  Layers
+} from 'lucide-react';
 
 // ── Default presets ────────────────────────────────────────────────────────
 const NETWORK_PRESETS = [
@@ -401,19 +419,22 @@ export default function Dashboard() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Benchmark Workbench</div>
-        <div className="page-subtitle">
-          Compare Fixed-Quality Baseline vs. Adaptive Optimized streaming under identical simulated network conditions
+        <div>
+          <h2 className="page-title">Streaming Workbench & Studio</h2>
+          <div className="page-subtitle">
+            Controlled dual-player benchmarking engine: Compare Fixed-Quality Baseline vs. Adaptive Bitrate (ABR) under real-time network and edge-cache simulation.
+          </div>
         </div>
       </div>
 
-      {isBenchmarking && <div className="benchmark-running-bar" style={{marginBottom:'16px'}} />}
+      {isBenchmarking && <div className="benchmark-running-bar" style={{ marginBottom: '20px' }} />}
 
       {errors.length > 0 && (
-        <div className="alert alert-error" style={{marginBottom:'16px'}}>
+        <div className="alert alert-error" style={{ marginBottom: '20px' }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
           <div>
             <strong>Configuration errors:</strong>
-            <ul style={{marginTop:'4px', paddingLeft:'16px'}}>
+            <ul style={{ marginTop: '4px', paddingLeft: '16px' }}>
               {errors.map((e, i) => <li key={i}>{e}</li>)}
             </ul>
           </div>
@@ -421,77 +442,88 @@ export default function Dashboard() {
       )}
 
       {!apiOnline && (
-        <div className="alert alert-warning" style={{marginBottom:'16px'}}>
-          ⚠️ Backend API offline – running in demo mode. Start the Express server for MySQL persistence.
+        <div className="alert alert-warning" style={{ marginBottom: '20px' }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            Backend API offline – running in resilient browser simulation mode. Start the Express server for MySQL persistence.
+          </div>
         </div>
       )}
 
       {/* ── Top KPI Stat Cards (Platform Analytics) ────────────────── */}
-      <div className="grid-4" style={{marginBottom:'24px'}}>
+      <div className="grid-4" style={{ marginBottom: '24px' }}>
         {/* Total Sessions */}
-        <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-            <div className="stat-label">Total Benchmarks</div>
-            <span style={{fontSize:'18px'}}>📊</span>
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Total Test Sessions</span>
+            <div className="stat-icon-wrap">
+              <Activity size={18} />
+            </div>
           </div>
-          <div className="stat-value" style={{marginTop:'8px', color:'var(--accent-blue)'}}>
+          <div className="stat-value">
             {summaryData ? summaryData.totalSessions : (isLoadingSummary ? '...' : 0)}
             <span className="stat-unit">runs</span>
           </div>
-          <div style={{fontSize:'11px', color:'var(--text-secondary)', marginTop:'6px'}}>
+          <div className="stat-sub">
             {summaryData
               ? `${summaryData.completedSessions} completed (${summaryData.runningSessions || 0} active)`
-              : 'Connecting to database...'}
+              : 'Syncing with MySQL database...'}
           </div>
         </div>
 
         {/* Avg Startup Delay */}
-        <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-            <div className="stat-label">Avg Startup Delay</div>
-            <span style={{fontSize:'18px'}}>⚡</span>
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Average Startup Time</span>
+            <div className="stat-icon-wrap" style={{ background: '#FEF3C7', color: '#D97706' }}>
+              <Zap size={18} />
+            </div>
           </div>
-          <div className="stat-value" style={{marginTop:'8px', color:'var(--accent-cyan)'}}>
+          <div className="stat-value">
             {summaryData && summaryData.totalSessions > 0
               ? (summaryData.avgStartupDelayMs / 1000).toFixed(2)
               : '0.00'}
             <span className="stat-unit">sec</span>
           </div>
-          <div style={{fontSize:'11px', color:'var(--text-secondary)', marginTop:'6px'}}>
-            Time to first video frame
+          <div className="stat-sub">
+            Time to first decoded video frame
           </div>
         </div>
 
         {/* Buffering Events */}
-        <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-            <div className="stat-label">Buffering Events</div>
-            <span style={{fontSize:'18px'}}>⏸</span>
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Buffering Stalls</span>
+            <div className="stat-icon-wrap" style={{ background: '#FEE2E2', color: '#DC2626' }}>
+              <PauseCircle size={18} />
+            </div>
           </div>
-          <div className="stat-value" style={{marginTop:'8px', color:'var(--accent-orange)'}}>
+          <div className="stat-value">
             {summaryData && summaryData.totalSessions > 0 ? summaryData.totalStallCount : 0}
             <span className="stat-unit">stalls</span>
           </div>
-          <div style={{fontSize:'11px', color:'var(--text-secondary)', marginTop:'6px'}}>
+          <div className="stat-sub">
             {summaryData && summaryData.totalSessions > 0
-              ? `Avg ${summaryData.avgStallsPerSession} stalls / ${summaryData.totalRebufferSec}s stalled`
+              ? `${summaryData.totalRebufferSec}s total starvation duration`
               : 'No buffer starvation recorded'}
           </div>
         </div>
 
         {/* Cache Hit Rate */}
-        <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-            <div className="stat-label">Cache Hit Rate</div>
-            <span style={{fontSize:'18px'}}>🎯</span>
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Cache Hit Ratio</span>
+            <div className="stat-icon-wrap" style={{ background: '#DCFCE7', color: '#16A34A' }}>
+              <CheckCircle2 size={18} />
+            </div>
           </div>
-          <div className="stat-value" style={{marginTop:'8px', color:'var(--accent-green)'}}>
+          <div className="stat-value">
             {summaryData && summaryData.totalSessions > 0 ? `${summaryData.cacheHitRate}%` : '0%'}
           </div>
-          <div style={{fontSize:'11px', color:'var(--text-secondary)', marginTop:'6px'}}>
+          <div className="stat-sub">
             {summaryData && summaryData.totalSessions > 0
               ? `${summaryData.totalCacheHits} hits / ${summaryData.totalCacheMisses} misses`
-              : 'Simulated edge cache ratio'}
+              : 'Simulated edge CDN caching'}
           </div>
         </div>
       </div>
@@ -519,11 +551,11 @@ export default function Dashboard() {
               <div style={{
                 display: 'flex',
                 gap: '10px',
-                padding: '8px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: '8px',
-                marginBottom: '12px',
-                border: '1px solid var(--border-color)',
+                padding: '10px',
+                background: 'var(--bg-base)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '14px',
+                border: '1px solid var(--border)',
                 alignItems: 'center'
               }}>
                 <img
@@ -532,22 +564,22 @@ export default function Dashboard() {
                   style={{ width: '84px', height: '48px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
                 />
                 <div style={{ overflow: 'hidden', flex: 1 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
                     {selectedVideo.title}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
-                    <span style={{ color: 'var(--accent-red)', fontWeight: '600' }}>{selectedVideo.category || 'HLS'}</span>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
+                    <span className="chip chip-blue" style={{ fontSize: '9.5px', padding: '0 4px' }}>{selectedVideo.category || 'HLS'}</span>
                     <span>•</span>
                     <span>{selectedVideo.duration_formatted || '10:00'}</span>
                     <span>•</span>
-                    <span style={{ color: 'var(--accent-cyan)', fontWeight: '600' }}>{selectedVideo.badge || 'HD'}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--primary-blue)' }}>{selectedVideo.badge || 'HD'}</span>
                   </div>
                 </div>
               </div>
             )}
 
             <div className="form-group">
-              <label className="form-label">Select Video Dropdown</label>
+              <label className="form-label">Video Stream</label>
               <select
                 className="form-control"
                 value={selectedVideo?.video_id || ''}
@@ -560,8 +592,9 @@ export default function Dashboard() {
               </select>
             </div>
             {selectedVideo?.stream_url && (
-              <div style={{marginTop:'8px', fontSize:'10px', color:'var(--text-muted)', wordBreak:'break-all'}}>
-                📡 {selectedVideo.stream_url}
+              <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--text-muted)', wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Film size={11} color="var(--primary-blue)" />
+                <span>{selectedVideo.stream_url}</span>
               </div>
             )}
           </div>
@@ -569,18 +602,21 @@ export default function Dashboard() {
           {/* Network Profile */}
           <div className="card">
             <div className="card-header">
-              <div className="card-title">Network Profile</div>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <SlidersHorizontal size={15} color="var(--primary-blue)" />
+                <span>Network Profile</span>
+              </div>
             </div>
 
-            <div className="form-group" style={{marginBottom:'14px'}}>
-              <label className="form-label">Preset</label>
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label">Simulation Preset</label>
               <select
                 className="form-control"
                 value={selectedProfile?.profile_id || ''}
                 onChange={handleProfileChange}
                 disabled={isBenchmarking}
               >
-                <option value="">— Manual Configuration —</option>
+                <option value="">— Custom Parameter Configuration —</option>
                 {profiles.map(p => (
                   <option key={p.profile_id} value={p.profile_id}>{p.profile_name}</option>
                 ))}
@@ -589,35 +625,37 @@ export default function Dashboard() {
 
             {selectedProfile && (
               <div style={{
-                background: 'rgba(29, 114, 232, 0.08)',
+                background: 'var(--light-blue)',
                 border: '1px solid var(--border-accent)',
                 borderRadius: 'var(--radius-md)',
-                padding: '10px 12px',
-                marginBottom: '14px',
-                fontSize: '11px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                fontSize: '11.5px',
                 lineHeight: '1.6'
               }}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px'}}>
-                  <strong style={{color:'var(--accent-cyan)'}}>{selectedProfile.profile_name}</strong>
-                  <span className="chip chip-blue" style={{fontSize:'10px'}}>Active Preset</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <strong style={{ color: 'var(--primary-blue)' }}>{selectedProfile.profile_name}</strong>
+                  <span className="chip chip-blue" style={{ fontSize: '10px' }}>Active Preset</span>
                 </div>
-                <div style={{color:'var(--text-secondary)'}}>
-                  Target BW: <span style={{color:'var(--text-primary)', fontFamily:'var(--font-mono)'}}>{selectedProfile.bandwidth_kbps} Kbps</span> ({(selectedProfile.bandwidth_kbps / 1000).toFixed(1)} Mbps)
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  Bandwidth: <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{selectedProfile.bandwidth_kbps} Kbps</span> ({(selectedProfile.bandwidth_kbps / 1000).toFixed(1)} Mbps)
                 </div>
-                <div style={{color:'var(--text-secondary)'}}>
-                  RTT Latency: <span style={{color:'var(--text-primary)', fontFamily:'var(--font-mono)'}}>{selectedProfile.latency_ms} ms</span> | Loss: <span style={{color:'var(--text-primary)', fontFamily:'var(--font-mono)'}}>{selectedProfile.packet_loss_pct || 0}%</span>
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  RTT Latency: <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{selectedProfile.latency_ms} ms</span> | Loss: <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{selectedProfile.packet_loss_pct || 0}%</span>
                 </div>
-                <div style={{color:'var(--text-secondary)'}}>
-                  Cache Hit Probability: <span style={{color:'var(--accent-green)', fontFamily:'var(--font-mono)'}}>{Math.round(selectedProfile.cache_hit_prob * 100)}%</span> (Edge CDN)
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  Cache Hit Probability: <span style={{ color: 'var(--success)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{Math.round(selectedProfile.cache_hit_prob * 100)}%</span> (Edge CDN)
                 </div>
               </div>
             )}
 
-            <div className="section-title">Parameters</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
+              Channel Parameters
+            </div>
 
             {/* Bandwidth */}
-            <div className="form-group" style={{marginBottom:'12px'}}>
-              <label className="form-label">Bandwidth</label>
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label">Bandwidth (Kbps)</label>
               <div className="range-row">
                 <input
                   type="range" className="form-range"
@@ -631,8 +669,8 @@ export default function Dashboard() {
             </div>
 
             {/* Latency */}
-            <div className="form-group" style={{marginBottom:'12px'}}>
-              <label className="form-label">Latency</label>
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label">RTT Latency (ms)</label>
               <div className="range-row">
                 <input
                   type="range" className="form-range"
@@ -646,8 +684,8 @@ export default function Dashboard() {
             </div>
 
             {/* Packet Loss */}
-            <div className="form-group" style={{marginBottom:'12px'}}>
-              <label className="form-label">Packet Loss</label>
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label">Packet Loss (%)</label>
               <div className="range-row">
                 <input
                   type="range" className="form-range"
@@ -661,8 +699,8 @@ export default function Dashboard() {
             </div>
 
             {/* Cache Hit Probability */}
-            <div className="form-group" style={{marginBottom:'12px'}}>
-              <label className="form-label">Cache Hit Probability</label>
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label">Edge Cache Hit Ratio</label>
               <div className="range-row">
                 <input
                   type="range" className="form-range"
@@ -676,8 +714,8 @@ export default function Dashboard() {
             </div>
 
             {/* Test Duration */}
-            <div className="form-group" style={{marginBottom:'16px'}}>
-              <label className="form-label">Test Duration</label>
+            <div className="form-group" style={{ marginBottom: '18px' }}>
+              <label className="form-label">Benchmark Duration</label>
               <div className="range-row">
                 <input
                   type="range" className="form-range"
@@ -690,19 +728,22 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {!isBenchmarking ? (
                 <>
-                  <button className="btn btn-success btn-lg w-full" onClick={startBenchmark}>
-                    ▶ Start Benchmark
+                  <button className="btn btn-primary btn-lg w-full" onClick={startBenchmark}>
+                    <Play size={16} fill="currentColor" />
+                    <span>Start Benchmark</span>
                   </button>
                   <button className="btn btn-secondary w-full" onClick={resetConfig}>
-                    ↺ Reset Configuration
+                    <RotateCcw size={14} />
+                    <span>Reset Parameters</span>
                   </button>
                 </>
               ) : (
                 <button className="btn btn-danger btn-lg w-full" onClick={() => stopBenchmark()}>
-                  ⏹ Stop Benchmark
+                  <Square size={16} fill="currentColor" />
+                  <span>Stop Benchmark</span>
                 </button>
               )}
             </div>
@@ -712,24 +753,29 @@ export default function Dashboard() {
           {isBenchmarking && (
             <div className="card">
               <div className="card-header">
-                <div className="card-title">Live Status</div>
-                <span className="chip chip-green">● RUNNING</span>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={15} color="var(--primary-blue)" />
+                  <span>Live Progress</span>
+                </div>
+                <span className="chip chip-green">Active Run</span>
               </div>
-              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                <div style={{display:'flex', justifyContent:'space-between'}}>
-                  <span className="text-muted text-sm">Elapsed</span>
-                  <span className="text-mono text-cyan">{benchmarkTimer}s / {config.testDurationSec}s</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Elapsed Time</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--primary-blue)' }}>
+                    {benchmarkTimer}s / {config.testDurationSec}s
+                  </span>
                 </div>
                 <div className="progress-bar-wrap">
                   <div className="progress-bar-fill" style={{
                     width: `${Math.min(100, (benchmarkTimer / config.testDurationSec) * 100)}%`,
-                    background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-cyan))'
+                    background: 'var(--primary-blue)'
                   }} />
                 </div>
                 {sessionId && (
-                  <div style={{display:'flex', justifyContent:'space-between'}}>
-                    <span className="text-muted text-sm">Session ID</span>
-                    <span className="text-mono" style={{fontSize:'11px'}}>#{sessionId}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Session Record</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>#{sessionId}</span>
                   </div>
                 )}
               </div>
@@ -752,9 +798,12 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {[
+                    { label: 'Strategy', b: 'Fixed Rendition', o: 'Adaptive ABR' },
+                    { label: 'Resolution', b: baselineMetrics?.currentResolution || '--', o: optimizedMetrics?.currentResolution || '--' },
                     { label: 'Startup', b: baselineMetrics?.startupDelayMs ? (baselineMetrics.startupDelayMs/1000).toFixed(2)+'s' : '--', o: optimizedMetrics?.startupDelayMs ? (optimizedMetrics.startupDelayMs/1000).toFixed(2)+'s' : '--' },
                     { label: 'Buffer', b: baselineMetrics?.currentBufferSec?.toFixed(1)+'s'||'--', o: optimizedMetrics?.currentBufferSec?.toFixed(1)+'s'||'--' },
                     { label: 'Stalls', b: baselineMetrics?.stallCount ?? '--', o: optimizedMetrics?.stallCount ?? '--' },
+                    { label: 'Switches', b: '0 (Locked)', o: optimizedMetrics?.qualitySwitches ?? '0' },
                     { label: 'Bitrate', b: baselineMetrics?.currentBitrateKbps ? baselineMetrics.currentBitrateKbps+'K' : '--', o: optimizedMetrics?.currentBitrateKbps ? optimizedMetrics.currentBitrateKbps+'K' : '--' },
                   ].map(row => (
                     <tr key={row.label} style={{borderTop:'1px solid var(--border)'}}>
@@ -818,18 +867,31 @@ export default function Dashboard() {
           </div>
 
           {/* ABR explanation */}
-          <div className="card card-sm">
-            <div style={{display:'flex', gap:'12px', alignItems:'flex-start'}}>
-              <div style={{fontSize:'20px'}}>🧠</div>
+          <div className="card card-sm" style={{ background: 'var(--light-blue)', borderColor: 'var(--border-accent)' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-sm)',
+                background: '#FFFFFF',
+                color: 'var(--primary-blue)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                border: '1px solid var(--border-accent)'
+              }}>
+                <Layers size={16} />
+              </div>
               <div>
-                <div style={{fontSize:'12px', fontWeight:600, color:'var(--text-primary)', marginBottom:'4px'}}>
-                  Custom ABR Algorithm — Decision Rules
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '3px' }}>
+                  Custom Adaptive Bitrate (ABR) Decision Heuristic
                 </div>
-                <div style={{fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.7'}}>
-                  <strong style={{color:'var(--accent-red)'}}>Downshift:</strong> Buffer &lt; 3.5 s → step down one level &nbsp;|&nbsp;
-                  <strong style={{color:'var(--accent-green)'}}>Upshift:</strong> Buffer &gt; 10 s AND next bitrate ≤ 75% of BW → step up &nbsp;|&nbsp;
-                  <strong style={{color:'var(--accent-cyan)'}}>Hold:</strong> 3.5–10 s → maintain quality.
-                  &nbsp; Decision interval: 1500 ms.
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                  <strong style={{ color: 'var(--error)' }}>Emergency Downshift:</strong> Buffer &lt; 3.5 s → step down 1 level &nbsp;|&nbsp;
+                  <strong style={{ color: 'var(--success)' }}>Conservative Upshift:</strong> Buffer &gt; 10.0 s AND candidate bitrate ≤ 75% safe bandwidth → step up 1 level &nbsp;|&nbsp;
+                  <strong style={{ color: 'var(--primary-blue)' }}>Steady State:</strong> 3.5 s – 10.0 s → maintain current rendition.
+                  &nbsp; Decision cycle: 1500 ms.
                 </div>
               </div>
             </div>
@@ -838,60 +900,70 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom Section: Recent Benchmarks & Platform Status ─────── */}
-      <div style={{marginTop:'24px'}}>
+      <div style={{ marginTop: '28px' }}>
         {summaryData?.recentSessions && summaryData.recentSessions.length > 0 ? (
-          <div className="card">
-            <div className="card-header">
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
               <div>
-                <div className="card-title">Recent Benchmark Sessions</div>
-                <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px'}}>
-                  Comparative trials stored in MySQL
+                <div className="card-title">Recent Benchmark Runs</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Comparative trials persisted in MySQL database
                 </div>
               </div>
-              <Link to="/history" className="btn btn-secondary btn-sm">View Complete History →</Link>
+              <Link to="/history" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span>View Complete History</span>
+                <ArrowRight size={13} />
+              </Link>
             </div>
 
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'12px'}}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
                 <thead>
-                  <tr style={{borderBottom:'1px solid var(--border)', textAlign:'left', color:'var(--text-muted)'}}>
-                    <th style={{padding:'10px 12px'}}>Session</th>
-                    <th style={{padding:'10px 12px'}}>Video Source</th>
-                    <th style={{padding:'10px 12px'}}>Network Scenario</th>
-                    <th style={{padding:'10px 12px'}}>Duration</th>
-                    <th style={{padding:'10px 12px'}}>Status</th>
-                    <th style={{padding:'10px 12px'}}>Recorded</th>
-                    <th style={{padding:'10px 12px', textAlign:'right'}}>Action</th>
+                  <tr>
+                    <th>Session</th>
+                    <th>Video Source</th>
+                    <th>Network Scenario</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Recorded</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summaryData.recentSessions.map(s => (
-                    <tr key={s.session_id} style={{borderBottom:'1px solid var(--border)'}}>
-                      <td style={{padding:'10px 12px', fontFamily:'var(--font-mono)', color:'var(--accent-cyan)'}}>
+                    <tr key={s.session_id}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--primary-blue)' }}>
                         #{s.session_id}
                       </td>
-                      <td style={{padding:'10px 12px', color:'var(--text-primary)', fontWeight:500}}>
+                      <td style={{ fontWeight: 600 }}>
                         {s.video_title || 'Mux Multi-Bitrate'}
                       </td>
-                      <td style={{padding:'10px 12px'}}>
-                        <span className="chip chip-blue" style={{fontSize:'11px'}}>
+                      <td>
+                        <span className="chip chip-blue">
                           {s.profile_name || `${s.sim_bandwidth_kbps} Kbps`}
                         </span>
                       </td>
-                      <td style={{padding:'10px 12px', color:'var(--text-secondary)', fontFamily:'var(--font-mono)'}}>
+                      <td style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                         {s.test_duration_sec}s
                       </td>
-                      <td style={{padding:'10px 12px'}}>
-                        <span className={`chip ${s.status === 'completed' ? 'chip-green' : s.status === 'running' ? 'chip-cyan' : 'chip-orange'}`}>
+                      <td>
+                        <span className={`chip ${s.status === 'completed' ? 'chip-green' : s.status === 'running' ? 'chip-blue' : 'chip-amber'}`}>
                           ● {s.status}
                         </span>
                       </td>
-                      <td style={{padding:'10px 12px', color:'var(--text-muted)'}}>
-                        {new Date(s.created_at).toLocaleString([], { dateStyle:'short', timeStyle:'short' })}
+                      <td style={{ color: 'var(--text-muted)' }}>
+                        {new Date(s.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                       </td>
-                      <td style={{padding:'10px 12px', textAlign:'right'}}>
-                        <Link to={`/report/${s.session_id}`} className="btn btn-secondary btn-xs">
-                          Report ↗
+                      <td style={{ textAlign: 'right' }}>
+                        <Link to={`/report/${s.session_id}`} className="btn btn-outline-blue btn-sm" style={{ padding: '4px 10px', fontSize: '11.5px' }}>
+                          <span>Report</span>
+                          <ArrowRight size={12} />
                         </Link>
                       </td>
                     </tr>
@@ -901,14 +973,25 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="card" style={{padding:'32px', textAlign:'center'}}>
-            <div className="empty-state">
-              <div className="empty-state-icon">📊</div>
-              <div className="empty-state-text" style={{fontSize:'16px', fontWeight:600, color:'var(--text-primary)', marginBottom:'6px'}}>
+          <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                background: 'var(--light-blue)',
+                color: 'var(--primary-blue)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <BarChart3 size={24} />
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 No Benchmark Sessions Recorded Yet
               </div>
-              <div className="empty-state-sub" style={{maxWidth:'540px', margin:'0 auto 16px auto', color:'var(--text-secondary)'}}>
-                The database is connected and operational. Choose a video source and network profile above, then click <strong>"Start Benchmark"</strong> to execute your first real comparative test.
+              <div style={{ maxWidth: '520px', margin: '0 auto', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                Select a video stream and network scenario above, then click <strong>"Start Benchmark"</strong> to execute your first comparative trial.
               </div>
             </div>
           </div>

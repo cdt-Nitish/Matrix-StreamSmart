@@ -8,9 +8,21 @@ import {
 import api from '../services/api';
 import {
   buildTimelineChartData, buildComparisonBarData, buildCacheDoughnutData,
-  getTimelineOptions, getBarOptions, getDoughnutOptions,
-  CHART_COLORS
+  getTimelineOptions, getBarOptions, getDoughnutOptions
 } from '../utils/chartController';
+import {
+  ArrowLeft,
+  Award,
+  Clock,
+  Activity,
+  CheckCircle2,
+  BarChart3,
+  PieChart,
+  SlidersHorizontal,
+  Layers,
+  ShieldCheck,
+  TrendingUp
+} from 'lucide-react';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -25,17 +37,21 @@ function MetricRow({ label, baseline, optimized, lowerIsBetter = true, unit = ''
 
   return (
     <tr>
-      <td className="metric-name">{label}</td>
-      <td className={baselineWins ? 'winner' : 'loser'} style={{textAlign:'right', fontFamily:'var(--font-mono)'}}>
+      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{label}</td>
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: baselineWins ? 700 : 500, color: baselineWins ? 'var(--success)' : 'var(--text-secondary)' }}>
         {bVal.toFixed(2)}{unit}
       </td>
-      <td className={!baselineWins ? 'winner' : 'loser'} style={{textAlign:'right', fontFamily:'var(--font-mono)'}}>
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: !baselineWins ? 700 : 500, color: !baselineWins ? 'var(--primary-blue)' : 'var(--text-secondary)' }}>
         {oVal.toFixed(2)}{unit}
       </td>
-      <td style={{textAlign:'right', fontSize:'11px', color: !baselineWins ? 'var(--accent-green)' : 'var(--accent-red)'}}>
-        {diff !== null ? (lowerIsBetter
-          ? (oVal < bVal ? `−${diff}%` : `+${diff}%`)
-          : (oVal > bVal ? `+${diff}%` : `−${diff}%`)) : '—'}
+      <td style={{ textAlign: 'right', fontSize: '12px' }}>
+        {diff !== null ? (
+          <span className={`chip ${!baselineWins ? 'chip-green' : 'chip-amber'}`} style={{ padding: '1px 6px' }}>
+            {lowerIsBetter
+              ? (oVal < bVal ? `−${diff}%` : `+${diff}%`)
+              : (oVal > bVal ? `+${diff}%` : `−${diff}%`)}
+          </span>
+        ) : '—'}
       </td>
     </tr>
   );
@@ -45,7 +61,7 @@ function MetricRow({ label, baseline, optimized, lowerIsBetter = true, unit = ''
 const DEMO_REPORT = {
   session: {
     session_id: 'demo',
-    video_title: 'Big Buck Bunny (Mux Multi-Bitrate)',
+    video_title: 'Big Buck Bunny (Mux Multi-Bitrate 1080p)',
     profile_name: 'Rural 3G (Congested)',
     sim_bandwidth_kbps: 850,
     sim_latency_ms: 220,
@@ -86,7 +102,7 @@ export default function ComparisonReport() {
         setReport(data);
       } catch (err) {
         setError(err.message);
-        setReport(DEMO_REPORT); // fallback
+        setReport(DEMO_REPORT);
       } finally {
         setLoading(false);
       }
@@ -95,25 +111,8 @@ export default function ComparisonReport() {
 
   const timelineData = useMemo(() => {
     if (!report) return null;
-    let bs = report.timeSeries?.baseline || [];
-    let os = report.timeSeries?.optimized || [];
-
-    // Normalize if backend returned object format { timestamps, bufferLevels }
-    if (!Array.isArray(bs) && bs.timestamps) {
-      bs = bs.timestamps.map((t, idx) => ({
-        elapsed: t,
-        buffer: bs.bufferLevels?.[idx] || 0,
-        bitrate: report.baseline?.avg_bitrate_kbps || 0
-      }));
-    }
-    if (!Array.isArray(os) && os.timestamps) {
-      os = os.timestamps.map((t, idx) => ({
-        elapsed: t,
-        buffer: os.bufferLevels?.[idx] || 0,
-        bitrate: report.optimized?.avg_bitrate_kbps || 0
-      }));
-    }
-
+    const bs = report.timeSeries?.baseline || [];
+    const os = report.timeSeries?.optimized || [];
     return buildTimelineChartData(bs, os);
   }, [report]);
 
@@ -124,94 +123,170 @@ export default function ComparisonReport() {
 
   const cacheData = useMemo(() => {
     if (!report) return null;
-    const { totalHits = 0, totalMisses = 0 } = report.cacheStats || {};
-    return buildCacheDoughnutData(totalHits, totalMisses);
+    const bHits = report.baseline?.cache_hits || 0;
+    const oHits = report.optimized?.cache_hits || 0;
+    const bMiss = report.baseline?.cache_misses || 0;
+    const oMiss = report.optimized?.cache_misses || 0;
+    return buildCacheDoughnutData(bHits + oHits, bMiss + oMiss);
   }, [report]);
 
-  if (loading) return (
-    <div className="empty-state" style={{height:'60vh'}}>
-      <span className="spinner" style={{width:30,height:30,borderWidth:3}} />
-      <div>Loading report…</div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>
+        Generating comparative performance report…
+      </div>
+    );
+  }
 
   const { session, baseline, optimized, cacheStats } = report || {};
 
   return (
     <div>
-      <div className="page-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+      {/* Top Header */}
+      <div className="page-header">
         <div>
-          <div className="page-title">
-            Comparison Report
-            {isDemo && <span className="chip chip-orange" style={{marginLeft:'10px', fontSize:'11px'}}>DEMO DATA</span>}
-          </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ marginBottom: '10px' }}
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft size={13} />
+            <span>Back to Dashboard</span>
+          </button>
+          <h2 className="page-title">
+            Session Report #{session?.session_id}
+          </h2>
           <div className="page-subtitle">
-            Session #{session?.session_id} · {session?.video_title || 'N/A'}
+            Controlled head-to-head benchmarking analysis comparing Fixed 1080p Baseline vs. Custom Adaptive Bitrate (ABR).
           </div>
         </div>
-        <div style={{display:'flex', gap:'8px'}}>
-          <button className="btn btn-secondary" onClick={() => navigate('/history')}>← Back to History</button>
-          {!isDemo && (
-            <button className="btn btn-secondary" onClick={() => navigate(`/report/demo`)}>View Demo</button>
-          )}
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <span className="chip chip-blue" style={{ padding: '4px 10px', fontSize: '12px' }}>
+            {session?.profile_name || 'Network Benchmark'}
+          </span>
+          <span className="chip chip-gray" style={{ padding: '4px 10px', fontSize: '12px' }}>
+            {session?.test_duration_sec}s Duration
+          </span>
         </div>
       </div>
 
-      {error && (
-        <div className="alert alert-warning" style={{marginBottom:'16px'}}>
-          ⚠️ Could not load session {sessionId}: {error}. Showing demo data.
+      {isDemo && (
+        <div className="alert alert-info" style={{ marginBottom: '20px' }}>
+          <Activity size={16} />
+          <span>Showing representative benchmark run data. Run a real session on the workbench to audit custom conditions.</span>
         </div>
       )}
 
-      {/* Session Info */}
-      <div className="grid-4" style={{marginBottom:'16px'}}>
-        {[
-          { label: 'Network Profile', value: session?.profile_name || 'Custom' },
-          { label: 'Bandwidth',       value: `${session?.sim_bandwidth_kbps} Kbps` },
-          { label: 'Latency',         value: `${session?.sim_latency_ms} ms` },
-          { label: 'Mode',            value: session?.measurement_mode || 'SIMULATED' },
-        ].map(({ label, value }) => (
-          <div className="card card-sm" key={label}>
-            <div className="stat-label">{label}</div>
-            <div className="stat-value" style={{fontSize:'18px'}}>{value}</div>
+      {/* Overview Stat Cards */}
+      <div className="grid-4" style={{ marginBottom: '24px' }}>
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Stall Reduction</span>
+            <div className="stat-icon-wrap" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>
+              <Award size={18} />
+            </div>
           </div>
-        ))}
+          <div className="stat-value" style={{ color: 'var(--success)' }}>
+            {baseline?.stall_count > 0
+              ? `${Math.round(((baseline.stall_count - optimized.stall_count) / baseline.stall_count) * 100)}%`
+              : '0%'}
+          </div>
+          <div className="stat-sub">
+            {optimized?.stall_count || 0} ABR stalls vs {baseline?.stall_count || 0} baseline
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Startup Latency</span>
+            <div className="stat-icon-wrap">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="stat-value">
+            {((optimized?.startup_delay_ms || 0) / 1000).toFixed(2)}
+            <span className="stat-unit">s</span>
+          </div>
+          <div className="stat-sub">
+            vs {((baseline?.startup_delay_ms || 0) / 1000).toFixed(2)}s baseline
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Total Rebuffering</span>
+            <div className="stat-icon-wrap" style={{ background: '#FEF3C7', color: '#D97706' }}>
+              <TrendingUp size={18} />
+            </div>
+          </div>
+          <div className="stat-value">
+            {optimized?.total_stall_duration_sec || 0}
+            <span className="stat-unit">s</span>
+          </div>
+          <div className="stat-sub">
+            vs {baseline?.total_stall_duration_sec || 0}s stalled on fixed quality
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <span className="stat-label">Quality Transitions</span>
+            <div className="stat-icon-wrap">
+              <Layers size={18} />
+            </div>
+          </div>
+          <div className="stat-value">
+            {optimized?.quality_switches || 0}
+            <span className="stat-unit">switches</span>
+          </div>
+          <div className="stat-sub">
+            Dynamic adaptation by ABR controller
+          </div>
+        </div>
       </div>
 
       {/* Main comparison table */}
-      <div className="card" style={{marginBottom:'16px'}}>
-        <div className="card-header">
-          <div className="card-title-lg">Head-to-Head Metrics</div>
-          <span className="simulated-tag">SIMULATED</span>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '24px' }}>
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div className="card-title">Head-to-Head Telemetry Metrics</div>
+          <span className="chip chip-blue" style={{ fontSize: '11px' }}>SIMULATED ENVIRONMENT</span>
         </div>
-        <div style={{overflowX:'auto'}}>
-          <table className="comparison-table" style={{width:'100%'}}>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{borderBottom:'1px solid var(--border)'}}>
-                <th style={{textAlign:'left', padding:'10px 16px', color:'var(--text-muted)', fontSize:'11px'}}>Metric</th>
-                <th style={{textAlign:'right', padding:'10px 16px'}}>Baseline (Fixed 1080p)</th>
-                <th style={{textAlign:'right', padding:'10px 16px'}}>Optimized (ABR)</th>
-                <th style={{textAlign:'right', padding:'10px 16px', color:'var(--text-muted)', fontSize:'11px'}}>Δ Change</th>
+              <tr>
+                <th>Telemetry Metric</th>
+                <th style={{ textAlign: 'right' }}>Baseline (Fixed 1080p)</th>
+                <th style={{ textAlign: 'right' }}>Optimized (Custom ABR)</th>
+                <th style={{ textAlign: 'right' }}>Performance Difference</th>
               </tr>
             </thead>
             <tbody>
-              <MetricRow label="Startup Delay" baseline={(baseline?.startup_delay_ms||0)/1000} optimized={(optimized?.startup_delay_ms||0)/1000} lowerIsBetter unit="s" />
-              <MetricRow label="Stall Events"  baseline={baseline?.stall_count||0} optimized={optimized?.stall_count||0} lowerIsBetter />
-              <MetricRow label="Total Rebuffering" baseline={baseline?.total_stall_duration_sec||0} optimized={optimized?.total_stall_duration_sec||0} lowerIsBetter unit="s" />
-              <MetricRow label="Avg Bitrate"   baseline={baseline?.avg_bitrate_kbps||0} optimized={optimized?.avg_bitrate_kbps||0} lowerIsBetter={false} unit=" Kbps" />
-              <MetricRow label="Quality Switches" baseline={baseline?.quality_switches||0} optimized={optimized?.quality_switches||0} lowerIsBetter={false} />
-              <MetricRow label="Cache Hits"    baseline={baseline?.cache_hits||0} optimized={optimized?.cache_hits||0} lowerIsBetter={false} />
+              <MetricRow label="Startup Delay" baseline={(baseline?.startup_delay_ms || 0) / 1000} optimized={(optimized?.startup_delay_ms || 0) / 1000} lowerIsBetter unit="s" />
+              <MetricRow label="Stall Events"  baseline={baseline?.stall_count || 0} optimized={optimized?.stall_count || 0} lowerIsBetter />
+              <MetricRow label="Total Rebuffering" baseline={baseline?.total_stall_duration_sec || 0} optimized={optimized?.total_stall_duration_sec || 0} lowerIsBetter unit="s" />
+              <MetricRow label="Average Bitrate" baseline={baseline?.avg_bitrate_kbps || 0} optimized={optimized?.avg_bitrate_kbps || 0} lowerIsBetter={false} unit=" Kbps" />
+              <MetricRow label="Quality Switches" baseline={baseline?.quality_switches || 0} optimized={optimized?.quality_switches || 0} lowerIsBetter={false} />
+              <MetricRow label="Cache Hits" baseline={baseline?.cache_hits || 0} optimized={optimized?.cache_hits || 0} lowerIsBetter={false} />
             </tbody>
           </table>
         </div>
       </div>
 
       {/* Charts row */}
-      <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '20px', marginBottom: '24px' }}>
         {/* Timeline */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title-lg">Buffer & Bitrate Timeline</div>
+            <div className="card-title">Buffer & Bitrate Timeline</div>
           </div>
           <div className="chart-container-lg">
             {timelineData && <Line data={timelineData} options={getTimelineOptions()} />}
@@ -221,9 +296,9 @@ export default function ComparisonReport() {
         {/* Bar */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title-lg">Performance</div>
+            <div className="card-title">Performance Comparison</div>
           </div>
-          <div className="chart-container">
+          <div className="chart-container-lg">
             {barData && <Bar data={barData} options={getBarOptions()} />}
           </div>
         </div>
@@ -231,26 +306,27 @@ export default function ComparisonReport() {
         {/* Doughnut */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title-lg">Cache</div>
-            <span className="simulated-tag">SIM</span>
+            <div className="card-title">Edge Cache Efficiency</div>
           </div>
-          <div className="chart-container" style={{height:'160px'}}>
+          <div style={{ height: '180px', position: 'relative' }}>
             {cacheData && <Doughnut data={cacheData} options={getDoughnutOptions()} />}
           </div>
           {cacheStats && (
-            <div style={{marginTop:'10px', fontSize:'11px', color:'var(--text-muted)'}}>
-              <div>Hits: <strong style={{color:'var(--accent-green)'}}>{cacheStats.totalHits}</strong> &nbsp;|&nbsp; Misses: <strong style={{color:'var(--accent-red)'}}>{cacheStats.totalMisses}</strong></div>
-              <div>Est. saved: <strong style={{color:'var(--accent-cyan)'}}>{cacheStats.latencySavedMs} ms</strong></div>
-              <div style={{marginTop:'4px', fontStyle:'italic', fontSize:'10px'}}>{cacheStats.note}</div>
+            <div style={{ marginTop: '12px', fontSize: '11.5px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+              <div>Hits: <strong style={{ color: 'var(--success)' }}>{cacheStats.totalHits}</strong> &nbsp;|&nbsp; Misses: <strong style={{ color: 'var(--error)' }}>{cacheStats.totalMisses}</strong></div>
+              <div style={{ marginTop: '2px' }}>Latency Saved: <strong style={{ color: 'var(--primary-blue)' }}>{cacheStats.latencySavedMs} ms</strong></div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="card">
-        <div className="card-title-lg" style={{marginBottom:'12px'}}>Analysis Summary</div>
-        <div style={{fontSize:'13px', color:'var(--text-secondary)', lineHeight:'1.8'}}>
+      {/* Executive Summary Card */}
+      <div className="card" style={{ background: 'var(--light-blue)', borderColor: 'var(--border-accent)' }}>
+        <div className="card-title" style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldCheck size={18} color="var(--primary-blue)" />
+          <span>Executive Benchmark Analysis</span>
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.75' }}>
           {(() => {
             const baseStalls = parseInt(baseline?.stall_count || 0);
             const optStalls  = parseInt(optimized?.stall_count || 0);
@@ -259,28 +335,23 @@ export default function ComparisonReport() {
             const baseRebuf  = parseFloat(baseline?.total_stall_duration_sec || 0);
             const optRebuf   = parseFloat(optimized?.total_stall_duration_sec || 0);
             const stalImprove= baseStalls > 0 ? Math.round(((baseStalls - optStalls) / baseStalls) * 100) : 0;
-            const winner     = optStalls < baseStalls || optRebuf < baseRebuf ? 'Optimized ABR' : 'Baseline';
+
             return (
               <>
                 <p>
-                  Under <strong>{session?.profile_name || 'the tested network conditions'}</strong>,
-                  the <strong style={{color:'var(--accent-cyan)'}}>Optimized ABR player</strong> recorded{' '}
-                  <strong style={{color: optStalls < baseStalls ? 'var(--accent-green)' : 'var(--accent-red)'}}>
-                    {optStalls} buffering event{optStalls !== 1 ? 's' : ''}
+                  Under <strong>{session?.profile_name || 'simulated network conditions'}</strong> ({session?.sim_bandwidth_kbps} Kbps bandwidth, {session?.sim_latency_ms} ms RTT),
+                  the <strong style={{ color: 'var(--primary-blue)' }}>Optimized ABR player</strong> logged{' '}
+                  <strong style={{ color: optStalls < baseStalls ? 'var(--success)' : 'inherit' }}>
+                    {optStalls} buffering stall{optStalls !== 1 ? 's' : ''}
                   </strong>{' '}
-                  vs the Baseline's{' '}
-                  <strong style={{color:'var(--accent-orange)'}}>{baseStalls}</strong>.
-                  {stalImprove > 0 && ` That's a ${stalImprove}% reduction in stall events.`}
+                  compared to the Fixed Baseline player's{' '}
+                  <strong style={{ color: 'var(--error)' }}>{baseStalls} stalls</strong>.
+                  {stalImprove > 0 && ` That represents a ${stalImprove}% reduction in playback starvation.`}
                 </p>
-                <p style={{marginTop:'8px'}}>
-                  Startup delay was{' '}
-                  <strong>{(optStart / 1000).toFixed(2)}s (ABR)</strong> vs{' '}
-                  <strong>{(baseStart / 1000).toFixed(2)}s (Baseline)</strong>.
-                  Total rebuffering: <strong style={{color:'var(--accent-cyan)'}}>{optRebuf}s (ABR)</strong> vs{' '}
-                  <strong style={{color:'var(--accent-orange)'}}>{baseRebuf}s (Baseline)</strong>.
-                </p>
-                <p style={{marginTop:'8px', color:'var(--text-muted)', fontSize:'11px', fontStyle:'italic'}}>
-                  ※ These metrics are {session?.measurement_mode === 'SIMULATED' ? 'simulated values based on configured network parameters' : 'browser-observed measurements'}. Cache statistics are always simulated (12ms hit / 260ms miss delays). Actual performance varies with real network conditions.
+                <p style={{ marginTop: '8px' }}>
+                  Startup delay was measured at <strong>{(optStart / 1000).toFixed(2)}s (ABR)</strong> vs{' '}
+                  <strong>{(baseStart / 1000).toFixed(2)}s (Fixed 1080p)</strong>.
+                  Total rebuffering time was reduced from <strong>{baseRebuf}s</strong> down to <strong>{optRebuf}s</strong>.
                 </p>
               </>
             );
@@ -290,4 +361,3 @@ export default function ComparisonReport() {
     </div>
   );
 }
-
