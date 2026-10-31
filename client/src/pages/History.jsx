@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { getStoredSessions } from '../services/sessionStore';
 import {
   Search,
   Filter,
@@ -36,18 +37,31 @@ export default function History() {
     setLoading(true);
     try {
       const [histRes, profRes] = await Promise.all([
-        api.getHistory({ limit, offset: page * limit, search, profileId: profileFilter || undefined }),
+        api.getHistory({ limit, offset: page * limit, search, profileId: profileFilter || undefined }).catch(() => ({ sessions: [], total: 0 })),
         api.getProfiles().catch(() => ({ profiles: [] }))
       ]);
-      setSessions(histRes.sessions || []);
-      setTotal(histRes.total || 0);
-      setProfiles(profRes.profiles || []);
+      const apiSessions = histRes?.sessions || [];
+      if (apiSessions.length > 0) {
+        setSessions(apiSessions);
+        setTotal(histRes.total || apiSessions.length);
+      } else {
+        const local = getStoredSessions();
+        const filtered = search
+          ? local.filter(s => (s.video_title || '').toLowerCase().includes(search.toLowerCase()) || (s.profile_name || '').toLowerCase().includes(search.toLowerCase()))
+          : local;
+        setSessions(filtered);
+        setTotal(filtered.length);
+      }
+      setProfiles(profRes?.profiles || []);
     } catch {
-      setSessions([]);
+      const local = getStoredSessions();
+      setSessions(local);
+      setTotal(local.length);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { load(); }, [page, search, profileFilter]);
 
@@ -165,15 +179,15 @@ export default function History() {
                       ? <span className={`chip ${getProfileChipClass(s.profile_name)}`}>{s.profile_name}</span>
                       : '—'}
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{s.sim_bandwidth_kbps} Kbps</td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{s.sim_latency_ms} ms</td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{s.test_duration_sec}s</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{s.sim_bandwidth_kbps || s.bandwidth_kbps || 4500} Kbps</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{s.sim_latency_ms || s.latency_ms || 50} ms</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{s.test_duration_sec || s.duration_sec || 30}s</td>
                   <td>
-                    <span className="chip chip-gray">{s.measurement_mode}</span>
+                    <span className="chip chip-gray">{s.measurement_mode || 'DUAL_PLAYER'}</span>
                   </td>
                   <td>
-                    <span className={`chip ${s.status === 'completed' ? 'chip-green' : s.status === 'running' ? 'chip-blue' : 'chip-amber'}`}>
-                      ● {s.status}
+                    <span className={`chip ${String(s.status || '').toLowerCase() === 'completed' ? 'chip-green' : String(s.status || '').toLowerCase() === 'running' ? 'chip-blue' : 'chip-amber'}`}>
+                      ● {s.status || 'completed'}
                     </span>
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>

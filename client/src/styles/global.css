@@ -1,15 +1,16 @@
 /**
- * StreamSmart – Blue & White SaaS Design System
- * Modern, Clean, Professional SaaS Aesthetic
+ * StreamSmart – Modern Blue & Slate SaaS Design System
+ * Clean, Professional, Production-Ready Streaming Analytics Platform
  * No Bootstrap. No Tailwind. Pure Handcrafted CSS.
  */
 
 /* ── 1. Color Palette & Design Tokens ────────────────────────────── */
 :root {
-  /* Brand Blues */
-  --primary-blue:    #2563EB;
-  --dark-blue:       #1E40AF;
-  --light-blue:      #EFF6FF;
+  /* Brand Blues (Primary Palette) */
+  --primary-blue:    #2563EB; /* Royal Blue – primary actions, active nav, buttons */
+  --sky-blue:        #38BDF8; /* Secondary Sky Blue – accents, highlights */
+  --dark-blue:       #1E40AF; /* Hover state for primary blue */
+  --light-blue:      #EFF6FF; /* Blue 50 – selected states, info backgrounds */
   --blue-50:         #EFF6FF;
   --blue-100:        #DBEAFE;
   --blue-200:        #BFDBFE;
@@ -19,18 +20,18 @@
   --blue-800:        #1E40AF;
 
   /* Surfaces & Backgrounds */
-  --bg-base:         #F8FAFC;
-  --bg-surface:      #FFFFFF;
-  --bg-card:         #FFFFFF;
+  --bg-base:         #F8FAFC; /* Main app background */
+  --bg-surface:      #FFFFFF; /* Cards, topbar */
+  --bg-card:         #FFFFFF; /* Card background */
   --bg-card-hover:   #F8FAFC;
   --bg-input:        #FFFFFF;
-  --bg-sidebar:      #FFFFFF;
-  --bg-subtle:       #F1F5F9;
+  --bg-sidebar:      #F1F5F9; /* Sidebar – light slate per spec */
+  --bg-subtle:       #F1F5F9; /* Subtle section backgrounds */
 
   /* Typography / Text Colors */
-  --text-primary:    #0F172A; /* Slate 900 */
-  --text-secondary:  #64748B; /* Slate 500 */
-  --text-muted:      #94A3B8; /* Slate 400 */
+  --text-primary:    #0F172A; /* Slate 900 – headings, key metrics */
+  --text-secondary:  #64748B; /* Slate 500 – body text, labels */
+  --text-muted:      #94A3B8; /* Slate 400 – placeholders, hints */
   --text-inverse:    #FFFFFF;
 
   /* Borders & Dividers */
@@ -39,7 +40,7 @@
   --border-accent:   #BFDBFE; /* Blue 200 */
   --border-focus:    #2563EB;
 
-  /* Semantic Feedback (Strict: No purple/magenta) */
+  /* Semantic Feedback Colors */
   --success:         #16A34A;
   --success-bg:      #F0FDF4;
   --success-border:  #BBF7D0;
@@ -56,6 +57,12 @@
   --info-bg:         #EFF6FF;
   --info-border:     #BFDBFE;
 
+  /* Aliases for backwards compatibility with legacy JSX references */
+  --primary:         #2563EB;
+  --primary-dark:    #1E40AF;
+  --primary-subtle:  #EFF6FF;
+  --danger:          #DC2626; /* Alias for --error */
+
   /* Clean Shadows (Subtle, professional SaaS) */
   --shadow-xs:       0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-sm:       0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
@@ -68,6 +75,7 @@
   --radius-md:       8px;
   --radius-lg:       12px;
   --radius-xl:       16px;
+  --radius:          8px; /* Alias for legacy JSX references */
 
   --sidebar-w:       250px;
   --topbar-h:        64px;
@@ -192,6 +200,7 @@ img {
   height: var(--topbar-h);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--bg-sidebar);
 }
 
 .sidebar-logo-icon {
@@ -225,6 +234,7 @@ img {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  background: var(--bg-sidebar);
 }
 
 .nav-section-label {
@@ -252,7 +262,7 @@ img {
 }
 
 .nav-item:hover {
-  background: var(--bg-base);
+  background: #E2E8F0;
   color: var(--text-primary);
 }
 
@@ -285,12 +295,12 @@ img {
 .sidebar-footer {
   padding: 14px 18px;
   border-top: 1px solid var(--border);
-  background: var(--bg-surface);
+  background: var(--bg-sidebar);
   flex-shrink: 0;
 }
 
 .sidebar-footer-card {
-  background: var(--bg-base);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 10px 12px;
@@ -449,7 +459,7 @@ img {
   max-width: 800px;
 }
 
-/* ── 8. Cards & Panels (Crisp SaaS White) ────────────────────────── */
+/* ── 8. Cards & Panels ────────────────────────────────────────────── */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -583,6 +593,10 @@ img {
   background: var(--dark-blue);
   border-color: var(--dark-blue);
 }
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 .btn-secondary {
   background: #FFFFFF;
@@ -593,6 +607,10 @@ img {
 .btn-secondary:hover {
   background: var(--bg-base);
   border-color: #CBD5E1;
+}
+.btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .btn-success {
@@ -655,6 +673,12 @@ img {
 .form-control:focus {
   border-color: var(--primary-blue);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.form-control:disabled {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 select.form-control {
@@ -729,6 +753,17 @@ select.form-control {
   font-size: 12px;
 }
 
+/* Table cell helpers */
+.td-primary {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.td-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 /* ── 13. Badges, Chips & Pills ───────────────────────────────────── */
 .chip {
   display: inline-flex;
@@ -756,10 +791,13 @@ select.form-control {
   text-transform: uppercase;
 }
 
-.badge-info    { background: var(--light-blue); color: var(--primary-blue); }
-.badge-success { background: var(--success-bg); color: var(--success); }
-.badge-warning { background: var(--warning-bg); color: var(--warning); }
-.badge-danger  { background: var(--error-bg);   color: var(--error); }
+/* Badge variants */
+.badge-info      { background: var(--light-blue);  color: var(--primary-blue); }
+.badge-primary   { background: var(--light-blue);  color: var(--primary-blue); border: 1px solid var(--border-accent); }
+.badge-secondary { background: var(--bg-subtle);   color: var(--text-secondary); border: 1px solid var(--border); }
+.badge-success   { background: var(--success-bg);  color: var(--success); }
+.badge-warning   { background: var(--warning-bg);  color: var(--warning); }
+.badge-danger    { background: var(--error-bg);    color: var(--error); }
 
 /* ── 14. Dual Player Comparison Grid ─────────────────────────────── */
 .dual-player-grid {
@@ -779,10 +817,12 @@ select.form-control {
   flex-direction: column;
 }
 
+/* Baseline Player: Slate color per spec */
 .player-card.baseline {
   border-top: 3px solid #64748B;
 }
 
+/* ABR/Optimized Player: Royal Blue per spec */
 .player-card.optimized {
   border-top: 3px solid var(--primary-blue);
 }
@@ -813,12 +853,14 @@ select.form-control {
   letter-spacing: 0.3px;
 }
 
+/* Baseline badge – Slate per spec */
 .player-badge.baseline {
   background: #F1F5F9;
   color: #475569;
   border: 1px solid #CBD5E1;
 }
 
+/* Optimized/ABR badge – Royal Blue per spec */
 .player-badge.optimized {
   background: var(--light-blue);
   color: var(--primary-blue);
@@ -1042,7 +1084,7 @@ select.form-control {
   margin-top: 2px;
 }
 
-/* ── 17. YouTube Video Rail & Cards (SaaS Style) ─────────────────── */
+/* ── 17. YouTube Video Rail & Cards ──────────────────────────────── */
 .yt-video-rail-container {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1405,6 +1447,13 @@ select.form-control {
   gap: 20px;
 }
 
+/* Analytics 4-column metric grid */
+.overview-metric-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 340px 1fr;
@@ -1460,6 +1509,7 @@ select.form-control {
 .alert-warning { background: var(--warning-bg); border-color: var(--warning-border); color: #B45309; }
 .alert-error   { background: var(--error-bg);   border-color: var(--error-border);   color: var(--error); }
 
+/* Progress bars */
 .benchmark-running-bar {
   height: 3px;
   background: linear-gradient(90deg, var(--primary-blue), #60A5FA, var(--primary-blue));
@@ -1528,9 +1578,16 @@ select.form-control {
   font-size: 18px;
   cursor: pointer;
   transition: color var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
 }
 .modal-close:hover {
   color: var(--text-primary);
+  background: var(--bg-base);
 }
 
 .modal-body {
@@ -1547,7 +1604,130 @@ select.form-control {
   background: var(--bg-base);
 }
 
-/* ── 22. Responsive Breakpoints ──────────────────────────────────── */
+/* ── 22. Admin Configuration Page ───────────────────────────────── */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.admin-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition);
+}
+
+.admin-list-item:hover {
+  border-color: var(--border-accent);
+}
+
+.admin-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-item-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-item-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.admin-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── 23. Utility & Helper Classes ────────────────────────────────── */
+
+/* Color semantic helpers */
+.text-green  { color: var(--success) !important; }
+.text-red    { color: var(--error) !important; }
+.text-blue   { color: var(--primary-blue) !important; }
+.text-amber  { color: var(--warning) !important; }
+.text-mono   { font-family: var(--font-mono); font-weight: 600; }
+
+/* Baseline vs optimized quick compare table header colors */
+.text-baseline  { color: #64748B; } /* Slate – Baseline per spec */
+.text-optimized { color: var(--primary-blue); } /* Royal Blue – ABR per spec */
+
+/* Simulated tag (Admin settings page) */
+.simulated-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: var(--warning-bg);
+  color: #B45309;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Spinner (Loading indicator) */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary-blue);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty state placeholder */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.empty-state-icon {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.empty-state-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.empty-state-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 440px;
+}
+
+/* ── 24. Responsive Breakpoints ──────────────────────────────────── */
 @media (max-width: 1200px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -1557,6 +1737,12 @@ select.form-control {
   }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .overview-metric-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .admin-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1585,7 +1771,455 @@ select.form-control {
   .grid-4, .grid-3, .grid-2 {
     grid-template-columns: 1fr;
   }
+  .overview-metric-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
   .abr-bandwidth-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 25. Overview Page – Metric Cards & Layout ───────────────────── */
+.overview-metric-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.metric-card-detailed {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all var(--transition);
+}
+
+.metric-card-detailed:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.metric-card-primary-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+
+.metric-sub-items {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.metric-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.metric-sub-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.metric-sub-val {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* ── 26. Overview Page – Main Layout ─────────────────────────────── */
+.overview-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.overview-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.overview-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: calc(var(--topbar-h) + 24px);
+}
+
+/* ── 27. Live Beacon / Status Pill ───────────────────────────────── */
+.live-beacon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.beacon-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: beacon-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes beacon-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+/* ── 28. Activities & Events Panel ───────────────────────────────── */
+.activities-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.activities-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-base);
+}
+
+.events-list {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition);
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.event-item:hover {
+  background: var(--bg-base);
+}
+
+.event-icon-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.event-icon-chip.info    { background: var(--info-bg);    color: var(--primary-blue); }
+.event-icon-chip.success { background: var(--success-bg); color: var(--success); }
+.event-icon-chip.warning { background: var(--warning-bg); color: #B45309; }
+.event-icon-chip.error   { background: var(--error-bg);   color: var(--error); }
+
+.event-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.event-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.event-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-time {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.event-desc {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ── 29. System Health Box ───────────────────────────────────────── */
+.system-health-box {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-base);
+}
+
+.system-health-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.health-row:last-child {
+  border-bottom: none;
+}
+
+/* ── 30. Optimization Timeline Card ─────────────────────────────── */
+.timeline-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.timeline-track {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 0;
+  position: relative;
+}
+
+.timeline-node {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary-blue);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-node.completed { background: var(--success); }
+.timeline-node.active    { background: var(--primary-blue); }
+.timeline-node.error     { background: var(--error); }
+.timeline-node.pending   { background: var(--text-muted); }
+
+.timeline-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.timeline-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-time-badge {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.timeline-desc {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* ── 31. Player Loading & Error Overlays ─────────────────────────── */
+.player-loading-overlay,
+.player-error-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.82);
+  color: #FFFFFF;
+  gap: 10px;
+  z-index: 10;
+}
+
+.player-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+/* ── 32. Workbench Slider Controls ───────────────────────────────── */
+.slider-group {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.slider-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.slider-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.slider-value {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--primary-blue);
+  background: var(--light-blue);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-accent);
+}
+
+.slider-input {
+  width: 100%;
+  accent-color: var(--primary-blue);
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+.slider-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.slider-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ── 33. Responsive – Additional Breakpoints ─────────────────────── */
+@media (max-width: 1200px) {
+  .overview-layout {
+    grid-template-columns: 1fr;
+  }
+  .overview-sidebar {
+    position: static;
+  }
+  .overview-metric-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .overview-metric-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .overview-metric-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .overview-metric-grid-3,
+  .overview-metric-grid-4 {
+    grid-template-columns: 1fr;
   }
 }

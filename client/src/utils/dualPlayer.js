@@ -6,7 +6,7 @@
  *    rendition (or user-chosen fixed quality). Built-in and custom ABR are disabled.
  *  - Player 2 (Optimized): Custom Adaptive Bitrate (ABR) Streaming.
  *    Monitors real buffer occupancy and available bandwidth every 1500 ms.
- *    Applies emergency downshifts and conservative upshifts directly to HLS.js.
+ *    Applies emergency downshifts, bandwidth-limit downshifts, and conservative upshifts.
  */
 
 import Hls from 'hls.js';
@@ -20,56 +20,87 @@ import {
 } from '../algorithms/abrEngine';
 import { logQualitySwitchEvent } from '../services/telemetryService';
 
-// ── Custom HLS.js Loader Factory ───────────────────────────────────────────
-// Simulates network bandwidth constraints, latency, and edge cache hit/miss delays
-// directly on segment delivery to HLS.js MSE buffers.
+// ── Custom HLS.js Throttled Loader Factory ─────────────────────────────────
+// Simulates network bandwidth constraints, latency, jitter, packet loss, and
+// edge cache hit/miss delays directly on video segment delivery into MSE buffers.
 
-function createThrottledLoader(config, networkConfig) {
-  const DefaultLoader = config.loader;
+function createThrottledLoaderClass(getNetworkConfig, trackerRef) {
+  const DefaultLoader = Hls.DefaultConfig.loader;
 
-  class ThrottledLoader extends DefaultLoader {
+  return class ThrottledLoader extends DefaultLoader {
+    constructor(config) {
+      super(config);
+      this.delayTimer = null;
+    }
+
     load(context, loaderConfig, callbacks) {
-      if (!networkConfig || !networkConfig.enabled || context.type !== 'fragment') {
+      const netConfig = getNetworkConfig ? getNetworkConfig() : null;
+
+      // Identify if request is a media fragment (video segment) vs manifest playlist
+      const isMediaFragment = Boolean(
+        context.frag ||
+        context.part ||
+        (context.url && (/\.(ts|m4s|mp4|aac|m4a)($|\?)/i.test(context.url) || !context.url.includes('.m3u8')))
+      );
+
+      // If network simulation is disabled or not a media fragment, execute standard fast load
+      if (!netConfig || !netConfig.enabled || !isMediaFragment) {
         return super.load(context, loaderConfig, callbacks);
       }
 
       const originalOnSuccess = callbacks.onSuccess;
+      const originalOnError   = callbacks.onError;
 
-      // Wrap onSuccess to inject simulated network & edge cache delays
       const wrappedCallbacks = {
         ...callbacks,
         onSuccess: (response, stats, ctx, networkDetails) => {
           try {
-            // Packet loss simulation: drop segment if packetLossPct condition met
-            if (networkConfig.packetLossPct > 0 && Math.random() * 100 < networkConfig.packetLossPct) {
-              if (callbacks.onError) {
-                callbacks.onError({ code: 408, text: 'Simulated Packet Loss' }, ctx, networkDetails);
+            // 1. Packet loss simulation: drop segment if condition met
+            const packetLossPct = parseFloat(netConfig.packetLossPct || 0);
+            if (packetLossPct > 0 && Math.random() * 100 < packetLossPct) {
+              if (originalOnError) {
+                originalOnError.call(this, { code: 408, text: 'Simulated Packet Loss (Timeout)' }, ctx, networkDetails);
                 return;
               }
             }
 
-            // Segment size in bits
-            const segmentBytes = stats?.total || stats?.loaded || response?.data?.byteLength || 500000;
+            // 2. Segment size in bits
+            const segmentBytes = stats?.total || stats?.loaded || response?.data?.byteLength || 350000;
             const segmentBits = segmentBytes * 8;
-            const bwKbps = Math.max(100, networkConfig.bandwidthKbps || 4500);
+            const bwKbps = Math.max(50, parseFloat(netConfig.bandwidthKbps) || 4500);
             const bwBps = bwKbps * 1000;
 
-            // Transfer time = (segmentBits / bwBps) * 1000
+            // 3. Transfer duration: (bits / bps) * 1000 ms
             const transferTimeMs = Math.round((segmentBits / bwBps) * 1000);
-            const latencyMs = Math.max(0, networkConfig.latencyMs || 0);
 
-            // Edge cache simulation: hit = 12ms, miss = 260ms
-            const isHit = Math.random() < (networkConfig.cacheHitProb ?? 0.5);
-            const cacheDelayMs = isHit ? 12 : 260;
+            // 4. Base RTT Latency + +/-10% Jitter
+            const latencyMs = Math.max(0, parseInt(netConfig.latencyMs, 10) || 0);
+            const jitterMs = Math.round((Math.random() * 0.2 - 0.1) * latencyMs);
 
-            // Total simulated delay
-            const totalDelayMs = transferTimeMs + latencyMs + cacheDelayMs;
-            const delayToApply = Math.min(totalDelayMs, 8000);
+            // 5. Edge Cache simulation: Hit = 12ms edge delay, Miss = 260ms origin delay
+            const cacheHitProb = netConfig.cacheHitProb !== undefined ? parseFloat(netConfig.cacheHitProb) : 0.75;
+            const isCacheHit = Math.random() < cacheHitProb;
+            const cacheDelayMs = isCacheHit ? 12 : 260;
 
-            setTimeout(() => {
+            if (trackerRef?.current?.recordCacheEvent) {
+              trackerRef.current.recordCacheEvent(isCacheHit);
+            }
+
+            // 6. Total simulated delivery delay
+            const totalDelayMs = Math.max(10, Math.min(transferTimeMs + latencyMs + jitterMs + cacheDelayMs, 12000));
+
+            this.delayTimer = setTimeout(() => {
+              this.delayTimer = null;
+              // Update loader stats with actual delivery completion time for accurate bandwidth estimation
+              if (stats && stats.loading) {
+                stats.loading.end = performance.now();
+              }
+              if (trackerRef?.current?.recordThroughput) {
+                trackerRef.current.recordThroughput(bwKbps);
+              }
               originalOnSuccess.call(this, response, stats, ctx, networkDetails);
-            }, delayToApply);
-          } catch {
+            }, totalDelayMs);
+          } catch (err) {
             originalOnSuccess.call(this, response, stats, ctx, networkDetails);
           }
         }
@@ -77,12 +108,26 @@ function createThrottledLoader(config, networkConfig) {
 
       super.load(context, loaderConfig, wrappedCallbacks);
     }
-  }
 
-  return ThrottledLoader;
+    abort() {
+      if (this.delayTimer) {
+        clearTimeout(this.delayTimer);
+        this.delayTimer = null;
+      }
+      super.abort();
+    }
+
+    destroy() {
+      if (this.delayTimer) {
+        clearTimeout(this.delayTimer);
+        this.delayTimer = null;
+      }
+      super.destroy();
+    }
+  };
 }
 
-// ── Baseline Player (Fixed Quality Comparison) ─────────────────────────────
+// ── Baseline Player (Fixed High Quality) ───────────────────────────────────
 
 export function createBaselinePlayer({ videoEl, src, networkConfig, onMetrics, onLevels, onError }) {
   if (!Hls.isSupported()) {
@@ -93,27 +138,39 @@ export function createBaselinePlayer({ videoEl, src, networkConfig, onMetrics, o
     throw new Error('HLS is not supported in this browser');
   }
 
+  // Mutable network config holder for dynamic updates
+  let currentNetConfig = { ...networkConfig };
+  const trackerRef = { current: null };
+
+  const ThrottledLoader = createThrottledLoaderClass(() => currentNetConfig, trackerRef);
+
   const hls = new Hls({
-    startLevel: -1,
-    autoStartLoad: true,
+    startLevel:       -1,
+    autoStartLoad:    true,
     autoLevelEnabled: false,
-    loader: createThrottledLoader(Hls.DefaultConfig, networkConfig),
+    loader:           ThrottledLoader,
   });
 
   const tracker = createTelemetryTracker({
     playerType: 'BASELINE',
-    sessionId: networkConfig?.sessionId,
+    sessionId: currentNetConfig?.sessionId,
     onMetricsUpdate: onMetrics,
   });
+  trackerRef.current = tracker;
+
+  let selectedQualityIndex = -1;
 
   hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
     // Lock to the highest available rendition (preferably 1080p)
     const highest = hls.levels.length - 1;
-    hls.currentLevel      = highest;
-    hls.loadLevel         = highest;
-    hls.autoLevelEnabled  = false;
+    selectedQualityIndex = highest;
+    hls.currentLevel     = highest;
+    hls.loadLevel        = highest;
+    hls.autoLevelEnabled = false;
+
     console.log(`[Baseline] Locked to highest level ${highest}:`, hls.levels[highest]);
     videoEl.play().catch(e => console.warn('[Baseline] Autoplay caught:', e.message));
+
     if (onLevels && hls.levels) {
       onLevels(hls.levels);
     }
@@ -149,18 +206,35 @@ export function createBaselinePlayer({ videoEl, src, networkConfig, onMetrics, o
     },
     getHls:     () => hls,
     getTracker: () => tracker,
+    getVideo:   () => videoEl,
+    getCurrentTime: () => videoEl.currentTime,
+    play() {
+      return videoEl.play().catch(err => console.warn('[Baseline] Play failed:', err.message));
+    },
+    pause() {
+      videoEl.pause();
+    },
+    seek(time) {
+      if (videoEl && !isNaN(time)) {
+        videoEl.currentTime = Math.max(0, time);
+      }
+    },
+    updateNetworkConfig(newConfig) {
+      currentNetConfig = { ...currentNetConfig, ...newConfig };
+    },
     setQuality(levelIndex) {
       if (!hls || !hls.levels) return;
       const target = Math.max(0, Math.min(levelIndex, hls.levels.length - 1));
-      hls.currentLevel = target;
-      hls.loadLevel = target;
+      selectedQualityIndex = target;
+      hls.currentLevel     = target;
+      hls.loadLevel        = target;
       hls.autoLevelEnabled = false;
       console.log(`[Baseline] Fixed quality locked to level ${target}:`, hls.levels[target]);
     }
   };
 }
 
-// ── Optimized Player (Custom ABR Heuristic) ────────────────────────────────
+// ── Optimized Player (Custom ABR Heuristic Engine) ─────────────────────────
 
 export function createOptimizedPlayer({
   videoEl,
@@ -180,18 +254,25 @@ export function createOptimizedPlayer({
     throw new Error('HLS is not supported in this browser');
   }
 
+  // Mutable network config holder for dynamic throttling updates
+  let currentNetConfig = { ...networkConfig };
+  const trackerRef = { current: null };
+
+  const ThrottledLoader = createThrottledLoaderClass(() => currentNetConfig, trackerRef);
+
   const hls = new Hls({
-    startLevel:       0,     // Start at lowest quality tier for rapid startup
+    startLevel:       0,     // Start at lowest rendition for rapid TTFF
     autoStartLoad:    true,
-    autoLevelEnabled: false, // Explicitly disable built-in ABR
-    loader: createThrottledLoader(Hls.DefaultConfig, networkConfig),
+    autoLevelEnabled: false, // Ensure built-in HLS.js ABR is replaced by custom engine
+    loader:           ThrottledLoader,
   });
 
   const tracker = createTelemetryTracker({
     playerType: 'OPTIMIZED',
-    sessionId: networkConfig?.sessionId,
+    sessionId: currentNetConfig?.sessionId,
     onMetricsUpdate: onMetrics,
   });
+  trackerRef.current = tracker;
 
   let abrInterval = null;
   let isAutoMode = true;
@@ -201,43 +282,42 @@ export function createOptimizedPlayer({
   function runABRTick() {
     if (!hls.levels || hls.levels.length === 0) return;
 
-    // 1. Calculate actual buffer occupancy ahead of current playback position
+    // 1. Calculate actual buffer headroom ahead of current playhead
     const buffer = calculateBufferOccupancy(videoEl);
 
-    // 2. Determine bandwidth: simulated bandwidth vs HLS.js EWMA estimate
-    const hlsBwEstimate = hls.bandwidthEstimate
-      ? Math.round(hls.bandwidthEstimate / 1000)
-      : 0;
-    const simBw = networkConfig?.bandwidthKbps || 4500;
+    // 2. Determine available bandwidth: configured simulation bandwidth
+    const simBw = parseFloat(currentNetConfig?.bandwidthKbps) || 4500;
     const availableBw = simBw;
     const safeBw = calculateSafeBandwidth(availableBw);
 
+    const hlsBwEstimate = tracker?.getMetrics()?.downloadBandwidthKbps || Math.round((hls.bandwidthEstimate || 0) / 1000);
     const activeLevelIndex = hls.currentLevel >= 0 ? hls.currentLevel : currentTargetLevel;
 
-    // If user selected manual resolution override, pause automatic switches
+    // 3. Handle manual quality override
     if (!isAutoMode) {
       if (onABRStateChange) {
         onABRStateChange({
           decision: 'MANUAL_OVERRIDE',
-          reasonDetail: `Manual override locked to Level ${activeLevelIndex}`,
+          reasonDetail: `Manual override locked to Level ${activeLevelIndex} (${hls.levels[activeLevelIndex]?.height || '--'}p)`,
           bufferSec: buffer,
           availableBandwidthKbps: availableBw,
           safeBandwidthKbps: Math.round(safeBw),
           estimatedBandwidthKbps: hlsBwEstimate,
           simulatedBandwidthKbps: simBw,
           isAuto: false,
-          currentLevelIndex: activeLevelIndex
+          currentLevelIndex: activeLevelIndex,
+          recommendedLevelIndex: activeLevelIndex
         });
       }
       return;
     }
 
-    // Ensure built-in HLS.js ABR remains disabled
+    // Keep built-in HLS.js autoLevel disabled so custom algorithm drives levels
     if (hls.autoLevelEnabled) {
       hls.autoLevelEnabled = false;
     }
 
-    // 3. Evaluate Custom ABR Heuristic
+    // 4. Evaluate Custom ABR Decision Heuristic
     const recommendation = recommendQuality({
       currentLevel: activeLevelIndex,
       bufferSec: buffer,
@@ -245,7 +325,7 @@ export function createOptimizedPlayer({
       hlsLevels: hls.levels,
     });
 
-    // Notify React component of live ABR diagnostic state
+    // Emit live diagnostics to React UI
     if (onABRStateChange) {
       onABRStateChange({
         decision: recommendation.reason,
@@ -256,11 +336,12 @@ export function createOptimizedPlayer({
         estimatedBandwidthKbps: hlsBwEstimate,
         simulatedBandwidthKbps: simBw,
         isAuto: true,
-        currentLevelIndex: activeLevelIndex
+        currentLevelIndex: activeLevelIndex,
+        recommendedLevelIndex: recommendation.nextLevel
       });
     }
 
-    // 4. Apply actual HLS.js quality change if target differs
+    // 5. Apply HLS.js level switch if recommended level differs
     if (recommendation.nextLevel !== currentTargetLevel) {
       const ladder = mapHlsLevels(hls.levels);
       const fromSpec = ladder[currentTargetLevel] || { label: `Level ${currentTargetLevel}` };
@@ -270,11 +351,11 @@ export function createOptimizedPlayer({
         `[Optimized ABR] ${recommendation.reason}: ${fromSpec.label} → ${toSpec.label} | Buffer: ${buffer.toFixed(1)}s | Safe BW: ${Math.round(safeBw)}Kbps`
       );
 
-      // Instruct HLS.js to switch level at fragment boundary
+      // Smooth switch at fragment boundary
       hls.nextLevel = recommendation.nextLevel;
 
-      // In emergency downshift, also set currentLevel to immediately drop quality
-      if (recommendation.reason === 'BUFFER_RISK_DOWNSHIFT') {
+      // Emergency buffer depletion or severe bandwidth drop: switch immediately to avoid stall
+      if (recommendation.reason === 'BUFFER_RISK_DOWNSHIFT' || recommendation.reason === 'BANDWIDTH_LIMIT') {
         hls.currentLevel = recommendation.nextLevel;
       }
 
@@ -298,9 +379,9 @@ export function createOptimizedPlayer({
         onQualitySwitch(switchData);
       }
 
-      // Record to MySQL database asynchronously
+      // Record to MySQL backend
       logQualitySwitchEvent({
-        sessionId: networkConfig?.sessionId,
+        sessionId: currentNetConfig?.sessionId,
         playerType: 'OPTIMIZED',
         elapsedSec,
         previousResolution: fromSpec.label,
@@ -313,12 +394,12 @@ export function createOptimizedPlayer({
   }
 
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
-    // Start at lowest level for rapid first-frame delivery
+    // Start at lowest level for fastest initial Time to First Frame (TTFF)
     hls.currentLevel     = 0;
     currentTargetLevel   = 0;
     hls.autoLevelEnabled = false;
 
-    // Run decision loop every 1500 ms
+    // Run custom ABR decision loop every 1500 ms
     if (abrInterval) clearInterval(abrInterval);
     abrInterval = setInterval(runABRTick, ABR_INTERVAL_MS);
 
@@ -334,7 +415,7 @@ export function createOptimizedPlayer({
     if (data.fatal) {
       switch (data.type) {
         case Hls.ErrorTypes.NETWORK_ERROR:
-          console.warn('[Optimized] Fatal network error – starting load recovery');
+          console.warn('[Optimized] Fatal network error – attempting recovery');
           hls.startLoad();
           break;
         case Hls.ErrorTypes.MEDIA_ERROR:
@@ -361,11 +442,27 @@ export function createOptimizedPlayer({
     },
     getHls:     () => hls,
     getTracker: () => tracker,
+    getVideo:   () => videoEl,
+    getCurrentTime: () => videoEl.currentTime,
+    play() {
+      return videoEl.play().catch(err => console.warn('[Optimized] Play failed:', err.message));
+    },
+    pause() {
+      videoEl.pause();
+    },
+    seek(time) {
+      if (videoEl && !isNaN(time)) {
+        videoEl.currentTime = Math.max(0, time);
+      }
+    },
+    updateNetworkConfig(newConfig) {
+      currentNetConfig = { ...currentNetConfig, ...newConfig };
+    },
     setQuality(levelIndex) {
       if (!hls) return;
       if (levelIndex === -1) {
         isAutoMode = true;
-        console.log('[Optimized] Switched to Auto (Custom ABR active)');
+        console.log('[Optimized] Restored Auto mode (Custom ABR active)');
       } else {
         isAutoMode = false;
         const target = Math.max(0, Math.min(levelIndex, hls.levels.length - 1));
@@ -377,3 +474,8 @@ export function createOptimizedPlayer({
     }
   };
 }
+
+export default {
+  createBaselinePlayer,
+  createOptimizedPlayer
+};

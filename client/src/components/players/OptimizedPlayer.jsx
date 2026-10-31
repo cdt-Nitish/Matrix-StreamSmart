@@ -8,17 +8,18 @@ import {
   Sliders,
   ArrowRight,
   Clock,
-  Activity
+  Activity,
+  ShieldAlert
 } from 'lucide-react';
 
 const OptimizedPlayer = forwardRef(function OptimizedPlayer(
   { src, networkConfig, onMetrics, sessionId },
   ref
 ) {
-  const videoRef  = useRef(null);
+  const videoRef = useRef(null);
   const playerRef = useRef(null);
-  const [status, setStatus]   = useState('idle');
-  const [levels, setLevels]   = useState([]);
+  const [status, setStatus] = useState('idle');
+  const [levels, setLevels] = useState([]);
   const [isAutoMode, setIsAutoMode] = useState(true);
   const [selectedLevelIndex, setSelectedLevelIndex] = useState(-1);
 
@@ -51,10 +52,17 @@ const OptimizedPlayer = forwardRef(function OptimizedPlayer(
   const [switchHistory, setSwitchHistory] = useState([]);
   const [lastSwitchTime, setLastSwitchTime] = useState(null);
 
+  // Expose imperative API for synchronized bench controls
   useImperativeHandle(ref, () => ({
     getTracker: () => playerRef.current?.getTracker(),
-    destroy: ()    => playerRef.current?.destroy(),
+    destroy: () => playerRef.current?.destroy(),
     setQuality: (idx) => handleSelectQuality(idx),
+    updateNetworkConfig: (cfg) => playerRef.current?.updateNetworkConfig(cfg),
+    play: () => playerRef.current?.play(),
+    pause: () => playerRef.current?.pause(),
+    seek: (time) => playerRef.current?.seek(time),
+    getCurrentTime: () => playerRef.current?.getCurrentTime() || 0,
+    getVideo: () => videoRef.current,
   }));
 
   const handleSelectQuality = (levelIndex) => {
@@ -69,6 +77,13 @@ const OptimizedPlayer = forwardRef(function OptimizedPlayer(
       playerRef.current.setQuality(levelIndex);
     }
   };
+
+  // Re-apply live network throttling when networkConfig updates
+  useEffect(() => {
+    if (playerRef.current?.updateNetworkConfig && networkConfig) {
+      playerRef.current.updateNetworkConfig(networkConfig);
+    }
+  }, [networkConfig]);
 
   useEffect(() => {
     if (!src || !videoRef.current) return;
@@ -129,6 +144,13 @@ const OptimizedPlayer = forwardRef(function OptimizedPlayer(
           <span className="abr-status-pill abr-status-downshift">
             <AlertTriangle size={12} strokeWidth={2.5} />
             <span>BUFFER_RISK_DOWNSHIFT</span>
+          </span>
+        );
+      case 'BANDWIDTH_LIMIT':
+        return (
+          <span className="abr-status-pill abr-status-downshift" style={{ background: '#FFFBEB', color: '#D97706', borderColor: '#FDE68A' }}>
+            <ShieldAlert size={12} strokeWidth={2.5} />
+            <span>BANDWIDTH_LIMIT</span>
           </span>
         );
       case 'STABLE_BANDWIDTH_UPSHIFT':
@@ -320,8 +342,8 @@ const OptimizedPlayer = forwardRef(function OptimizedPlayer(
                     <span style={{ color: 'var(--text-secondary)' }}>{item.fromLevel}</span>
                     <ArrowRight size={12} color="var(--primary-blue)" />
                     <span style={{ color: 'var(--text-primary)' }}>{item.toLevel}</span>
-                    <span className={`chip ${item.reason === 'BUFFER_RISK_DOWNSHIFT' ? 'chip-red' : item.reason === 'STABLE_BANDWIDTH_UPSHIFT' ? 'chip-green' : 'chip-blue'}`} style={{ fontSize: '9.5px', padding: '1px 6px' }}>
-                      {item.reason === 'BUFFER_RISK_DOWNSHIFT' ? 'Downshift' : item.reason === 'STABLE_BANDWIDTH_UPSHIFT' ? 'Upshift' : 'Hold'}
+                    <span className={`chip ${item.reason === 'BUFFER_RISK_DOWNSHIFT' || item.reason === 'BANDWIDTH_LIMIT' ? 'chip-red' : item.reason === 'STABLE_BANDWIDTH_UPSHIFT' ? 'chip-green' : 'chip-blue'}`} style={{ fontSize: '9.5px', padding: '1px 6px' }}>
+                      {item.reason === 'BUFFER_RISK_DOWNSHIFT' ? 'Downshift' : item.reason === 'BANDWIDTH_LIMIT' ? 'Bandwidth Drop' : item.reason === 'STABLE_BANDWIDTH_UPSHIFT' ? 'Upshift' : 'Hold'}
                     </span>
                   </div>
                   <div className="abr-switch-reason">

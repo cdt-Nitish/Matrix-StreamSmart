@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
 import { createBaselinePlayer } from '../../utils/dualPlayer';
 import YouTubeQualitySelector from './YouTubeQualitySelector';
-import { Lock, Sliders } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 const BaselinePlayer = forwardRef(function BaselinePlayer(
   { src, networkConfig, onMetrics, sessionId },
   ref
 ) {
-  const videoRef    = useRef(null);
-  const playerRef   = useRef(null);
-  const [status, setStatus]     = useState('idle');
-  const [levels, setLevels]     = useState([]);
+  const videoRef = useRef(null);
+  const playerRef = useRef(null);
+  const [status, setStatus] = useState('idle');
+  const [levels, setLevels] = useState([]);
   const [selectedLevelIndex, setSelectedLevelIndex] = useState(-1);
-  const [metrics, setMetrics]   = useState({
+  const [metrics, setMetrics] = useState({
     currentResolution: '--',
     currentBitrateKbps: 0,
     currentBufferSec: 0,
@@ -23,10 +23,17 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
     currentlyStalled: false,
   });
 
+  // Expose imperative API for synchronized bench controls
   useImperativeHandle(ref, () => ({
     getTracker: () => playerRef.current?.getTracker(),
-    destroy: ()    => playerRef.current?.destroy(),
+    destroy: () => playerRef.current?.destroy(),
     setQuality: (idx) => handleSelectQuality(idx),
+    updateNetworkConfig: (cfg) => playerRef.current?.updateNetworkConfig(cfg),
+    play: () => playerRef.current?.play(),
+    pause: () => playerRef.current?.pause(),
+    seek: (time) => playerRef.current?.seek(time),
+    getCurrentTime: () => playerRef.current?.getCurrentTime() || 0,
+    getVideo: () => videoRef.current,
   }));
 
   const handleSelectQuality = (levelIndex) => {
@@ -35,6 +42,13 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
       playerRef.current.setQuality(levelIndex);
     }
   };
+
+  // Re-apply live network throttling when networkConfig updates
+  useEffect(() => {
+    if (playerRef.current?.updateNetworkConfig && networkConfig) {
+      playerRef.current.updateNetworkConfig(networkConfig);
+    }
+  }, [networkConfig]);
 
   useEffect(() => {
     if (!src || !videoRef.current) return;
@@ -59,6 +73,9 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
         },
         onLevels: (lvls) => {
           setLevels(lvls || []);
+          if (lvls && lvls.length > 0) {
+            setSelectedLevelIndex(lvls.length - 1);
+          }
         },
         onError: (err) => {
           setStatus('error');
@@ -140,14 +157,14 @@ const BaselinePlayer = forwardRef(function BaselinePlayer(
           <Lock size={13} color="#475569" />
           <span style={{ color: '#0F172A', fontWeight: 600 }}>LOCKED RENDITION:</span>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary-blue)', fontWeight: 700 }}>
-            {metrics.currentResolution}
+            {metrics.currentResolution !== '--' ? metrics.currentResolution : '1080p HD'}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             (Auto-switching disabled)
           </span>
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Target: {metrics.currentBitrateKbps > 0 ? `${metrics.currentBitrateKbps} Kbps` : 'Max Available'}
+          Target: {metrics.currentBitrateKbps > 0 ? `${metrics.currentBitrateKbps} Kbps` : 'Max Available (1080p)'}
         </div>
       </div>
 

@@ -113,11 +113,11 @@ async function runScenarioTests() {
     assert.strictEqual(step3.reason, 'BUFFER_RISK_DOWNSHIFT');
   });
 
-  // ── Scenario E: Network Recovery (850 -> 10000 Kbps) ──────────────────────
+  // ── Scenario E: Network Recovery (1200 -> 10000 Kbps) ──────────────────────
   console.log('\nScenario E: Network Recovery (Start Low -> Boost Bandwidth)');
   test('Recovery: starts low at level 1 -> bandwidth recovers -> buffer refills -> upshifts', () => {
-    // 1. Initial low state at level 1, buffer 5s (steady hold at 850k)
-    const step1 = recommendQuality({ currentLevel: 1, bufferSec: 5.0, bandwidthKbps: 850 });
+    // 1. Initial low state at level 1, buffer 5s (steady hold at 1200k, safe BW = 900k >= 800k)
+    const step1 = recommendQuality({ currentLevel: 1, bufferSec: 5.0, bandwidthKbps: 1200 });
     assert.strictEqual(step1.nextLevel, 1);
     assert.strictEqual(step1.reason, 'STEADY_STATE_HOLD');
 

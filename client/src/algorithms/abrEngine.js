@@ -9,9 +9,10 @@
  * Core Formulas & Rules:
  *  - Safe Bandwidth: T_safe = Available Bandwidth * 0.75
  *  - Buffer Occupancy: B = video.buffered.end(i) - video.currentTime
- *  - Rule 1 (Emergency Downshift): B < 3.5 s -> Step down one level
- *  - Rule 2 (Conservative Upshift): B > 10.0 s AND nextLevel.bitrate <= T_safe -> Step up one level
- *  - Rule 3 (Steady State): 3.5 s <= B <= 10.0 s (or bandwidth insufficient) -> Hold current level
+ *  - Rule 1 (Emergency Downshift): B < 3.5 s -> Step down to prevent buffer starvation (BUFFER_RISK_DOWNSHIFT)
+ *  - Rule 2 (Bandwidth Limit Downshift): Current bitrate > T_safe -> Immediately downshift to sustainable tier (BANDWIDTH_LIMIT)
+ *  - Rule 3 (Conservative Upshift): B > 10.0 s AND nextLevel.bitrate <= T_safe -> Step up one level (STABLE_BANDWIDTH_UPSHIFT)
+ *  - Rule 4 (Steady State): 3.5 s <= B <= 10.0 s (or bandwidth insufficient) -> Hold current level (STEADY_STATE_HOLD)
  *
  * Designed to map dynamically to actual manifest levels (hls.levels)
  * rather than assuming fixed resolutions.
@@ -95,8 +96,8 @@ export function mapHlsLevels(hlsLevels) {
   }
 
   return hlsLevels.map((lvl, index) => {
-    const height = lvl.height || 0;
-    const width = lvl.width || 0;
+    const height = lvl.height || (lvl.attrs?.RESOLUTION ? parseInt(lvl.attrs.RESOLUTION.split('x')[1]) : 0);
+    const width = lvl.width || (lvl.attrs?.RESOLUTION ? parseInt(lvl.attrs.RESOLUTION.split('x')[0]) : 0);
     const bitrateBps = lvl.bitrate || lvl.averageBitrate || 0;
     const bitrateKbps = Math.round(bitrateBps / 1000) || QUALITY_LADDER[Math.min(index, QUALITY_LADDER.length - 1)].bitrateKbps;
 
@@ -124,7 +125,11 @@ export function mapHlsLevels(hlsLevels) {
 /**
  * StreamSmart Custom ABR Decision Engine
  *
- * Evaluates current buffer occupancy and bandwidth, applying 3-state heuristic rules.
+ * Evaluates current buffer occupancy and bandwidth, applying 4-state heuristic rules:
+ * 1. BUFFER_RISK_DOWNSHIFT (B < 3.5s)
+ * 2. BANDWIDTH_LIMIT (Current bitrate > Safe Bandwidth)
+ * 3. STABLE_BANDWIDTH_UPSHIFT (B > 10.0s AND candidate <= Safe Bandwidth)
+ * 4. STEADY_STATE_HOLD (Stable buffer and bandwidth)
  *
  * @param {object} params
  * @param {number} params.currentLevel    - Current active zero-based level index
@@ -133,7 +138,7 @@ export function mapHlsLevels(hlsLevels) {
  * @param {Array}  [params.hlsLevels]     - Manifest levels from HLS.js
  * @returns {{
  *   nextLevel: number,
- *   reason: 'BUFFER_RISK_DOWNSHIFT' | 'STABLE_BANDWIDTH_UPSHIFT' | 'STEADY_STATE_HOLD',
+ *   reason: 'BUFFER_RISK_DOWNSHIFT' | 'BANDWIDTH_LIMIT' | 'STABLE_BANDWIDTH_UPSHIFT' | 'STEADY_STATE_HOLD',
  *   reasonDetail: string,
  *   safeBandwidthKbps: number,
  *   label: string,
@@ -144,15 +149,29 @@ export function mapHlsLevels(hlsLevels) {
  */
 export function recommendQuality({ currentLevel = 0, bufferSec = 0, bandwidthKbps = 4500, hlsLevels }) {
   const ladder = mapHlsLevels(hlsLevels);
-  const maxLevel = ladder.length - 1;
+  const maxLevel = Math.max(0, ladder.length - 1);
   const safeCurrentLevel = Math.max(0, Math.min(Number(currentLevel) || 0, maxLevel));
   const safeBW = calculateSafeBandwidth(bandwidthKbps);
   const currentSpec = ladder[safeCurrentLevel] || { level: safeCurrentLevel, label: `${safeCurrentLevel}`, bitrateKbps: 0 };
 
   const buf = Math.max(0, Number(bufferSec) || 0);
 
+  // Single-quality streams cannot adapt
+  if (ladder.length <= 1) {
+    return {
+      nextLevel: 0,
+      reason: 'STEADY_STATE_HOLD',
+      reasonDetail: `Single rendition stream (${currentSpec.label}) — adaptation disabled`,
+      safeBandwidthKbps: Math.round(safeBW),
+      label: currentSpec.label,
+      targetSpec: currentSpec,
+      currentSpec,
+      isSwitch: false
+    };
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
-  // Rule 1: Emergency Downshift (Buffer Risk Prevention)
+  // Rule 1: Emergency Downshift (Buffer Starvation Prevention)
   // If buffer occupancy is below 3.5 seconds, immediately drop quality by 1 level
   // to avoid buffer starvation / stall events.
   // ──────────────────────────────────────────────────────────────────────────
@@ -172,8 +191,35 @@ export function recommendQuality({ currentLevel = 0, bufferSec = 0, bandwidthKbp
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Rule 2: Conservative Upshift
-  // If buffer occupancy exceeds 10.0 seconds AND the next higher rendition's
+  // Rule 2: Bandwidth Constraint Downshift (Never exceed safe bandwidth)
+  // If current rendition's bitrate exceeds the safe bandwidth capacity,
+  // immediately step down to the highest rendition that satisfies T_safe.
+  // ──────────────────────────────────────────────────────────────────────────
+  if (currentSpec.bitrateKbps > safeBW && safeCurrentLevel > 0) {
+    // Find the highest sustainable rendition that fits under safeBW
+    let targetLevel = 0;
+    for (let i = safeCurrentLevel - 1; i >= 0; i--) {
+      if (ladder[i].bitrateKbps <= safeBW) {
+        targetLevel = i;
+        break;
+      }
+    }
+    const targetSpec = ladder[targetLevel];
+    return {
+      nextLevel: targetLevel,
+      reason: 'BANDWIDTH_LIMIT',
+      reasonDetail: `Bandwidth constraint (${bandwidthKbps} Kbps, safe: ${Math.round(safeBW)} Kbps) — current ${currentSpec.label} (${currentSpec.bitrateKbps} Kbps) exceeds safe threshold. Downshifting to ${targetSpec.label}`,
+      safeBandwidthKbps: Math.round(safeBW),
+      label: targetSpec.label,
+      targetSpec,
+      currentSpec,
+      isSwitch: true
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Rule 3: Conservative Upshift
+  // If buffer occupancy exceeds 10.0 seconds AND the candidate next rendition's
   // bitrate is less than or equal to the 75% safe bandwidth threshold.
   // ──────────────────────────────────────────────────────────────────────────
   if (buf > BUFFER_HIGH_THRESHOLD && safeCurrentLevel < maxLevel) {
@@ -194,7 +240,7 @@ export function recommendQuality({ currentLevel = 0, bufferSec = 0, bandwidthKbp
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Rule 3: Steady State (Hold Current Rendition)
+  // Rule 4: Steady State (Hold Current Rendition)
   // Maintains current quality if buffer is in stable range [3.5s - 10.0s]
   // or if bandwidth cannot comfortably sustain the next higher rendition.
   // ──────────────────────────────────────────────────────────────────────────
@@ -233,4 +279,3 @@ export default {
   mapHlsLevels,
   recommendQuality
 };
-

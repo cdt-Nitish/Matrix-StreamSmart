@@ -4,6 +4,7 @@ const db = require('../config/db');
 const TestSession = require('../models/TestSession');
 const PlayerMetric = require('../models/PlayerMetric');
 const PlaybackEvent = require('../models/PlaybackEvent');
+const fallback = require('../utils/inMemoryFallbackStore');
 const { estimateLatencySaved } = require('../utils/cacheSimulator');
 
 // Shared aggregate analytics summary handler (used by both GET / and GET /summary)
@@ -63,6 +64,7 @@ async function getAnalyticsSummary(req, res) {
     res.json({
       success: true,
       service: 'StreamSmart Analytics Service',
+      storageEngine: 'mysql',
       totalSessions,
       completedSessions,
       runningSessions,
@@ -84,7 +86,89 @@ async function getAnalyticsSummary(req, res) {
       }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.warn('[AnalyticsSummary] MySQL unavailable, calculating summary from fallback store:', err.code || err.message);
+    const sessions = fallback.getSessions();
+    const metrics = fallback.getAllMetrics();
+
+    const totalSessions = sessions.length;
+    const completedSessions = sessions.filter(s => s.status === 'completed' || s.status === 'COMPLETED').length;
+    const runningSessions = sessions.filter(s => s.status === 'running').length;
+
+    let totalStalls = 0;
+    let totalStartup = 0;
+    let totalRebuffer = 0;
+    let totalBitrate = 0;
+    let totalHits = 0;
+    let totalMisses = 0;
+
+    metrics.forEach(m => {
+      totalStalls += Number(m.stall_count || 0);
+      totalStartup += Number(m.startup_delay_ms || 0);
+      totalRebuffer += Number(m.total_stall_duration_sec || 0);
+      totalBitrate += Number(m.avg_bitrate_kbps || 0);
+      totalHits += Number(m.cache_hits || 0);
+      totalMisses += Number(m.cache_misses || 0);
+    });
+
+    const mCount = metrics.length || 1;
+    const cacheRequests = totalHits + totalMisses;
+    const cacheHitRate = cacheRequests > 0 ? Number(((totalHits / cacheRequests) * 100).toFixed(1)) : 0;
+
+    const baselineMetrics = metrics.filter(m => m.player_type === 'BASELINE');
+    const optimizedMetrics = metrics.filter(m => m.player_type === 'OPTIMIZED');
+
+    const computeGroup = (playerType, list) => {
+      const count = list.length || 1;
+      const stalls = list.reduce((a, b) => a + Number(b.stall_count || 0), 0);
+      const startup = list.reduce((a, b) => a + Number(b.startup_delay_ms || 0), 0);
+      const rebuf = list.reduce((a, b) => a + Number(b.total_stall_duration_sec || 0), 0);
+      const br = list.reduce((a, b) => a + Number(b.avg_bitrate_kbps || 0), 0);
+      const sw = list.reduce((a, b) => a + Number(b.quality_switches || 0), 0);
+      const hits = list.reduce((a, b) => a + Number(b.cache_hits || 0), 0);
+      const misses = list.reduce((a, b) => a + Number(b.cache_misses || 0), 0);
+      return {
+        player_type: playerType,
+        totalRuns: list.length,
+        avgStartupDelayMs: Math.round(startup / count),
+        totalStalls: stalls,
+        avgStallsPerRun: parseFloat((stalls / count).toFixed(2)),
+        totalStallSec: parseFloat(rebuf.toFixed(2)),
+        avgBitrateKbps: Math.round(br / count),
+        avgQualitySwitches: parseFloat((sw / count).toFixed(1)),
+        totalCacheHits: hits,
+        totalCacheMisses: misses
+      };
+    };
+
+    const comparisonRows = [
+      computeGroup('BASELINE', baselineMetrics),
+      computeGroup('OPTIMIZED', optimizedMetrics)
+    ];
+
+    res.json({
+      success: true,
+      service: 'StreamSmart Analytics Service',
+      storageEngine: 'in-memory-fallback',
+      totalSessions,
+      completedSessions,
+      runningSessions,
+      avgStartupDelayMs: Math.round(totalStartup / mCount),
+      totalStallCount: totalStalls,
+      avgStallsPerSession: parseFloat((totalStalls / (sessions.length || 1)).toFixed(2)),
+      totalRebufferSec: parseFloat(totalRebuffer.toFixed(1)),
+      avgBitrateKbps: Math.round(totalBitrate / mCount),
+      totalCacheHits: totalHits,
+      totalCacheMisses: totalMisses,
+      cacheHitRate,
+      playerComparison: comparisonRows,
+      recentSessions: sessions.slice(0, 6),
+      endpoints: {
+        summary: 'GET /api/analytics/summary',
+        history: 'GET /api/analytics/history',
+        sessionReport: 'GET /api/analytics/sessions/:id/report',
+        sessionEvents: 'GET /api/analytics/sessions/:id/events'
+      }
+    });
   }
 }
 
@@ -98,9 +182,8 @@ router.get('/summary', getAnalyticsSummary);
 router.get('/history', async (req, res) => {
   try {
     const { limit = 20, offset = 0, profileId, search } = req.query;
-    let sessions = await TestSession.findAll({ limit, offset, profileId });
+    let sessions = await TestSession.findAll({ limit: parseInt(limit, 10), offset: parseInt(offset, 10), profileId });
 
-    // Client-side search filter (in production, add SQL WHERE LIKE)
     if (search) {
       const q = search.toLowerCase();
       sessions = sessions.filter(s =>
@@ -111,7 +194,7 @@ router.get('/history', async (req, res) => {
     }
 
     const total = await TestSession.count(profileId);
-    res.json({ sessions, total, limit: parseInt(limit), offset: parseInt(offset) });
+    res.json({ sessions, total, limit: parseInt(limit, 10), offset: parseInt(offset, 10) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -121,8 +204,16 @@ router.get('/history', async (req, res) => {
 router.get('/sessions/:id/report', async (req, res) => {
   try {
     const { id } = req.params;
-    const session = await TestSession.findById(id);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    let session = await TestSession.findById(id);
+
+    // Fallback search in memory
+    if (!session) {
+      session = fallback.getSessionById(id);
+    }
+
+    if (!session) {
+      return res.status(404).json({ error: `Session #${id} not found in database or memory archive` });
+    }
 
     const metrics = await PlayerMetric.findBySession(id);
     const events  = await PlaybackEvent.getTimeSeriesForChart(id);
@@ -135,13 +226,13 @@ router.get('/sessions/:id/report', async (req, res) => {
     const baselineEvents  = events.filter(e => e.player_type === 'BASELINE');
     const optimizedEvents = events.filter(e => e.player_type === 'OPTIMIZED');
 
-    // Build time-series data for charts (array of points format for chartController)
+    // Build time-series data for charts
     const buildTimeSeries = (evts, defaultBitrate = 0) =>
       evts.map(e => ({
-        elapsed: parseFloat(e.elapsed_sec),
-        buffer: parseFloat(e.buffer_level_sec),
-        delay: parseInt(e.simulated_delay_ms),
-        resolution: e.resolution_label,
+        elapsed: parseFloat(e.elapsed_sec || 0),
+        buffer: parseFloat(e.buffer_level_sec || 0),
+        delay: parseInt(e.simulated_delay_ms || 0, 10),
+        resolution: e.resolution_label || 'unknown',
         bitrate: defaultBitrate
       }));
 
@@ -156,7 +247,7 @@ router.get('/sessions/:id/report', async (req, res) => {
       optimized,
       timeSeries: {
         baseline:  buildTimeSeries(baselineEvents, baseline.avg_bitrate_kbps || 5000),
-        optimized: buildTimeSeries(optimizedEvents, optimized.avg_bitrate_kbps || 1400)
+        optimized: buildTimeSeries(optimizedEvents, optimized.avg_bitrate_kbps || 1200)
       },
       cacheStats: {
         totalHits:     totalCacheHits,
@@ -182,7 +273,4 @@ router.get('/sessions/:id/events', async (req, res) => {
   }
 });
 
-
-
 module.exports = router;
-

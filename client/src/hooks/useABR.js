@@ -119,8 +119,8 @@ export default function useABR({
       // Instruct HLS.js to switch rendition at fragment boundary
       hlsInstance.nextLevel = recommendation.nextLevel;
 
-      // In case of emergency downshift, also set currentLevel to immediately drop quality
-      if (recommendation.reason === 'BUFFER_RISK_DOWNSHIFT') {
+      // In case of emergency downshift or bandwidth limit, immediately drop quality
+      if (recommendation.reason === 'BUFFER_RISK_DOWNSHIFT' || recommendation.reason === 'BANDWIDTH_LIMIT') {
         hlsInstance.currentLevel = recommendation.nextLevel;
       }
 

@@ -5,15 +5,17 @@
  * and the React/Vite development server (port 5173).
  */
 
+require('dotenv').config();
 const { spawn } = require('child_process');
 const path = require('path');
 
 const rootDir = path.resolve(__dirname, '..');
 const clientDir = path.join(rootDir, 'client');
+const port = process.env.PORT || 5001;
 
 console.log('\n=============================================================');
 console.log('🚀 StreamSmart Dual-Process Dev Runner');
-console.log('   Backend API:  http://localhost:5001');
+console.log(`   Backend API:  http://localhost:${port}`);
 console.log('   Frontend Web: http://localhost:5173');
 console.log('=============================================================\n');
 

@@ -24,8 +24,10 @@ import {
   AlertTriangle,
   Radio,
   BarChart3,
-  Layers
+  Layers,
+  Pause
 } from 'lucide-react';
+import { saveStoredSession } from '../services/sessionStore';
 
 // ── Default presets ────────────────────────────────────────────────────────
 const NETWORK_PRESETS = [
@@ -351,6 +353,12 @@ export default function Dashboard() {
     setIsBenchmarking(true);
     setBenchmarkTimer(0);
 
+    // Synchronously start playback on both players
+    setTimeout(() => {
+      baselineRef.current?.play();
+      optimizedRef.current?.play();
+    }, 150);
+
     // Timer tick
     timerRef.current = setInterval(() => {
       setBenchmarkTimer(t => {
@@ -373,6 +381,37 @@ export default function Dashboard() {
     clearInterval(syncRef.current);
     setIsBenchmarking(false);
 
+    // Pause both players synchronously
+    baselineRef.current?.pause();
+    optimizedRef.current?.pause();
+
+    const hits = (baselineMetrics?.cacheHits || 0) + (optimizedMetrics?.cacheHits || 0);
+    const misses = (baselineMetrics?.cacheMisses || 0) + (optimizedMetrics?.cacheMisses || 0);
+
+    // Persist to client store for instant local and offline access
+    saveStoredSession({
+      session_id: id || `sess-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      video_title: selectedVideo?.title || 'Benchmark Stream',
+      profile_name: selectedProfile?.profile_name || 'Custom Preset',
+      status: 'COMPLETED',
+      duration_sec: config.testDurationSec,
+      baseline_stalls: baselineMetrics?.stallCount || 0,
+      baseline_rebuffer_sec: baselineMetrics?.totalStallDurationSec || 0,
+      baseline_startup_ms: baselineMetrics?.startupDelayMs || 0,
+      baseline_resolution: baselineMetrics?.currentResolution || '1080p',
+      optimized_stalls: optimizedMetrics?.stallCount || 0,
+      optimized_rebuffer_sec: optimizedMetrics?.totalStallDurationSec || 0,
+      optimized_startup_ms: optimizedMetrics?.startupDelayMs || 0,
+      optimized_resolution: optimizedMetrics?.currentResolution || '720p',
+      stalls_avoided: Math.max(0, (baselineMetrics?.stallCount || 0) - (optimizedMetrics?.stallCount || 0)),
+      rebuffer_saved_sec: Math.max(0, parseFloat(((baselineMetrics?.totalStallDurationSec || 0) - (optimizedMetrics?.totalStallDurationSec || 0)).toFixed(1))),
+      cache_hit_rate: hits + misses > 0 ? parseFloat(((hits / (hits + misses)) * 100).toFixed(1)) : 0,
+      total_cache_hits: hits,
+      total_cache_misses: misses,
+      switches: optimizedMetrics?.qualitySwitches || 0
+    });
+
     if (id) {
       try {
         await persistMetrics(id);
@@ -382,7 +421,7 @@ export default function Dashboard() {
         console.warn('[Dashboard] Could not persist session:', err.message);
       }
     }
-  }, [sessionId, persistMetrics, fetchSummary]);
+  }, [sessionId, persistMetrics, fetchSummary, baselineMetrics, optimizedMetrics, selectedVideo, selectedProfile, config.testDurationSec]);
 
   // Attach tracker refs for persistence
   useEffect(() => {
@@ -402,6 +441,32 @@ export default function Dashboard() {
     setConfig({ bandwidthKbps: 4500, latencyMs: 65, packetLossPct: 0.2, cacheHitProb: 0.75, testDurationSec: 60 });
     setErrors([]);
   };
+
+  // ── Synchronized Dual-Player Controls ─────────────────────────────────────
+  const handlePlayBoth = useCallback(() => {
+    baselineRef.current?.play();
+    optimizedRef.current?.play();
+  }, []);
+
+  const handlePauseBoth = useCallback(() => {
+    baselineRef.current?.pause();
+    optimizedRef.current?.pause();
+  }, []);
+
+  const handleRestartBoth = useCallback(() => {
+    baselineRef.current?.seek(0);
+    optimizedRef.current?.seek(0);
+    baselineRef.current?.play();
+    optimizedRef.current?.play();
+  }, []);
+
+  const handleSyncPlayheads = useCallback(() => {
+    const baseTime = baselineRef.current?.getCurrentTime();
+    if (typeof baseTime === 'number' && !isNaN(baseTime)) {
+      optimizedRef.current?.seek(baseTime);
+    }
+  }, []);
+
 
   const networkConfig = {
     enabled:       isBenchmarking,
@@ -792,8 +857,8 @@ export default function Dashboard() {
                 <thead>
                   <tr>
                     <th style={{textAlign:'left', padding:'4px 0', color:'var(--text-muted)', fontSize:'10px'}}>Metric</th>
-                    <th style={{textAlign:'right', color:'var(--accent-orange)', fontSize:'10px'}}>Baseline</th>
-                    <th style={{textAlign:'right', color:'var(--accent-cyan)', fontSize:'10px'}}>Optimized</th>
+                    <th style={{textAlign:'right', color:'#64748B', fontSize:'10px'}}>Baseline</th>
+                    <th style={{textAlign:'right', color:'var(--primary-blue)', fontSize:'10px'}}>Optimized</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -820,6 +885,65 @@ export default function Dashboard() {
 
         {/* ── RIGHT: Players + Charts ─────────────────────────────────── */}
         <div className="players-panel">
+
+          {/* Synchronized Playback Control Toolbar */}
+          <div className="card card-sm" style={{ marginBottom: '14px', background: '#FFFFFF', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Radio size={14} color="var(--primary-blue)" />
+                  Synchronized Controls:
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handlePlayBoth}
+                  title="Play both video streams simultaneously"
+                >
+                  <Play size={13} fill="currentColor" />
+                  <span>Play Both</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handlePauseBoth}
+                  title="Pause both video streams simultaneously"
+                >
+                  <Pause size={13} />
+                  <span>Pause Both</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleRestartBoth}
+                  title="Rewind both players to 0:00"
+                >
+                  <RotateCcw size={13} />
+                  <span>Restart (0:00)</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleSyncPlayheads}
+                  title="Align Optimized player playhead to Baseline player"
+                >
+                  <SlidersHorizontal size={13} />
+                  <span>Sync Playheads</span>
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#64748B' }}></span>
+                  Baseline: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>Locked 1080p</strong>
+                </span>
+                <span>|</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-blue)' }}></span>
+                  Optimized: <strong style={{ color: 'var(--primary-blue)', fontFamily: 'var(--font-mono)' }}>Custom ABR</strong>
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Dual player grid */}
           <div className="dual-player-grid">

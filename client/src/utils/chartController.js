@@ -27,7 +27,7 @@ export const CHART_COLORS = {
 export const SAAS_CHART_DEFAULTS = {
   responsive: true,
   maintainAspectRatio: false,
-  animation: { duration: 350 },
+  animation: { duration: 300 },
   plugins: {
     legend: {
       labels: {
@@ -79,19 +79,66 @@ export const SAAS_CHART_DEFAULTS = {
 };
 
 /**
+ * Normalizes point data across varied schemas
+ */
+function normalizePoint(p) {
+  if (!p) return null;
+  const elapsed = Number(
+    p.elapsed !== undefined
+      ? p.elapsed
+      : (p.elapsed_sec !== undefined
+          ? p.elapsed_sec
+          : (typeof p.timestamp === 'string' ? parseFloat(p.timestamp) : p.timestamp || 0))
+  );
+
+  const buffer = Number(
+    p.buffer !== undefined
+      ? p.buffer
+      : (p.bufferSec !== undefined
+          ? p.bufferSec
+          : (p.buffer_level_sec !== undefined ? p.buffer_level_sec : 0))
+  );
+
+  const bitrate = Number(
+    p.bitrate !== undefined
+      ? p.bitrate
+      : (p.bitrateKbps !== undefined
+          ? p.bitrateKbps
+          : (p.avg_bitrate_kbps !== undefined ? p.avg_bitrate_kbps : 0))
+  );
+
+  return { elapsed, buffer, bitrate };
+}
+
+/**
  * Build dataset arrays for the Buffer + Bitrate timeline chart.
  * Blue & Slate corporate styling.
  */
-export function buildTimelineChartData(baselineSeries, optimizedSeries) {
-  const labels = [...new Set([
-    ...(baselineSeries?.map(p => p.elapsed) || []),
-    ...(optimizedSeries?.map(p => p.elapsed) || []),
-  ])].sort((a, b) => a - b).map(t => `${t.toFixed(0)}s`);
+export function buildTimelineChartData(baselineSeries = [], optimizedSeries = []) {
+  const normBase = (baselineSeries || []).map(normalizePoint).filter(Boolean);
+  const normOpt  = (optimizedSeries || []).map(normalizePoint).filter(Boolean);
 
-  const interpolate = (series, times) =>
+  const rawTimes = [
+    ...normBase.map(p => p.elapsed),
+    ...normOpt.map(p => p.elapsed)
+  ].filter(t => !isNaN(t) && t >= 0);
+
+  const uniqueTimes = [...new Set(rawTimes.map(t => Math.round(t)))].sort((a, b) => a - b);
+  const labels = uniqueTimes.length > 0 ? uniqueTimes.map(t => `${t}s`) : ['0s'];
+
+  const interpolate = (series, times, key) =>
     times.map(t => {
-      const pt = series?.find(p => parseFloat(p.elapsed?.toFixed(0)) === parseFloat(t));
-      return pt ? pt.buffer : null;
+      if (!series || series.length === 0) return null;
+      let best = null;
+      let minDiff = 1.5;
+      for (const p of series) {
+        const diff = Math.abs(p.elapsed - t);
+        if (diff <= minDiff) {
+          minDiff = diff;
+          best = p;
+        }
+      }
+      return best ? best[key] : null;
     });
 
   return {
@@ -99,7 +146,7 @@ export function buildTimelineChartData(baselineSeries, optimizedSeries) {
     datasets: [
       {
         label: 'Baseline Buffer (Fixed)',
-        data: interpolate(baselineSeries, labels.map(l => parseFloat(l))),
+        data: interpolate(normBase, uniqueTimes, 'buffer'),
         borderColor: CHART_COLORS.baseline,
         backgroundColor: CHART_COLORS.baselineAlpha,
         borderWidth: 2,
@@ -111,7 +158,7 @@ export function buildTimelineChartData(baselineSeries, optimizedSeries) {
       },
       {
         label: 'Optimized Buffer (ABR)',
-        data: interpolate(optimizedSeries, labels.map(l => parseFloat(l))),
+        data: interpolate(normOpt, uniqueTimes, 'buffer'),
         borderColor: CHART_COLORS.optimized,
         backgroundColor: CHART_COLORS.optimizedAlpha,
         borderWidth: 2.2,
@@ -123,10 +170,7 @@ export function buildTimelineChartData(baselineSeries, optimizedSeries) {
       },
       {
         label: 'Baseline Bitrate (1080p)',
-        data: interpolate(
-          baselineSeries?.map(p => ({ ...p, buffer: p.bitrate })),
-          labels.map(l => parseFloat(l))
-        ),
+        data: interpolate(normBase, uniqueTimes, 'bitrate'),
         borderColor: '#94A3B8',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
@@ -139,10 +183,7 @@ export function buildTimelineChartData(baselineSeries, optimizedSeries) {
       },
       {
         label: 'Optimized Bitrate (Dynamic)',
-        data: interpolate(
-          optimizedSeries?.map(p => ({ ...p, buffer: p.bitrate })),
-          labels.map(l => parseFloat(l))
-        ),
+        data: interpolate(normOpt, uniqueTimes, 'bitrate'),
         borderColor: '#1D4ED8',
         backgroundColor: 'transparent',
         borderWidth: 2,
@@ -161,27 +202,27 @@ export function buildTimelineChartData(baselineSeries, optimizedSeries) {
  * Build grouped bar chart data for startup / stall comparison.
  */
 export function buildComparisonBarData(baselineMetrics, optimizedMetrics) {
+  const bStartup = parseFloat(((baselineMetrics?.startup_delay_ms  || baselineMetrics?.startupDelayMs  || 0) / 1000).toFixed(2));
+  const bStallDur = parseFloat(Number(baselineMetrics?.total_stall_duration_sec  || baselineMetrics?.totalStallDurationSec  || 0).toFixed(2));
+  const bStalls = parseInt(baselineMetrics?.stall_count  || baselineMetrics?.stallCount  || 0, 10);
+
+  const oStartup = parseFloat(((optimizedMetrics?.startup_delay_ms || optimizedMetrics?.startupDelayMs || 0) / 1000).toFixed(2));
+  const oStallDur = parseFloat(Number(optimizedMetrics?.total_stall_duration_sec || optimizedMetrics?.totalStallDurationSec || 0).toFixed(2));
+  const oStalls = parseInt(optimizedMetrics?.stall_count || optimizedMetrics?.stallCount || 0, 10);
+
   return {
     labels: ['Startup Delay (s)', 'Total Rebuffering (s)', 'Stall Count'],
     datasets: [
       {
         label: 'Baseline (Fixed 1080p)',
-        data: [
-          parseFloat(((baselineMetrics?.startup_delay_ms  || baselineMetrics?.startupDelayMs  || 0) / 1000).toFixed(2)),
-          parseFloat((baselineMetrics?.total_stall_duration_sec  || baselineMetrics?.totalStallDurationSec  || 0)),
-          parseInt(baselineMetrics?.stall_count  || baselineMetrics?.stallCount  || 0),
-        ],
+        data: [bStartup, bStallDur, bStalls],
         backgroundColor: '#94A3B8',
         borderRadius: 4,
         borderSkipped: false,
       },
       {
         label: 'Optimized (Adaptive ABR)',
-        data: [
-          parseFloat(((optimizedMetrics?.startup_delay_ms || optimizedMetrics?.startupDelayMs || 0) / 1000).toFixed(2)),
-          parseFloat((optimizedMetrics?.total_stall_duration_sec || optimizedMetrics?.totalStallDurationSec || 0)),
-          parseInt(optimizedMetrics?.stall_count || optimizedMetrics?.stallCount || 0),
-        ],
+        data: [oStartup, oStallDur, oStalls],
         backgroundColor: '#2563EB',
         borderRadius: 4,
         borderSkipped: false,
@@ -193,11 +234,26 @@ export function buildComparisonBarData(baselineMetrics, optimizedMetrics) {
 /**
  * Build doughnut chart data for cache efficiency.
  */
-export function buildCacheDoughnutData(hits, misses) {
+export function buildCacheDoughnutData(hits = 0, misses = 0) {
+  const h = Math.max(0, parseInt(hits, 10) || 0);
+  const m = Math.max(0, parseInt(misses, 10) || 0);
+
+  if (h === 0 && m === 0) {
+    return {
+      labels: ['No Cache Requests'],
+      datasets: [{
+        data: [1],
+        backgroundColor: ['#E2E8F0'],
+        borderColor: ['#FFFFFF'],
+        borderWidth: 2,
+      }]
+    };
+  }
+
   return {
     labels: ['Cache Hits (12ms)', 'Cache Misses (260ms)'],
     datasets: [{
-      data: [hits || 0, misses || 0],
+      data: [h, m],
       backgroundColor: [CHART_COLORS.cacheHit, '#E2E8F0'],
       borderColor: ['#FFFFFF', '#FFFFFF'],
       borderWidth: 2,
@@ -247,7 +303,7 @@ export function getDoughnutOptions() {
     responsive: true,
     maintainAspectRatio: false,
     cutout: '68%',
-    animation: { duration: 350 },
+    animation: { duration: 300 },
     plugins: {
       legend: {
         position: 'bottom',

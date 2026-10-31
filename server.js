@@ -13,7 +13,7 @@ const adminRoutes      = require('./routes/adminRoutes');
 const fs = require('fs');
 
 const app  = express();
-const PORT = process.env.PORT || 5001;
+const PORT = parseInt(process.env.PORT, 10) || 5000;
 const clientDistPath = path.join(__dirname, 'client/dist');
 const hasClientDist = fs.existsSync(clientDistPath);
 
@@ -184,28 +184,43 @@ app.use((req, res) => {
   });
 });
 
-// ── Asynchronous Server Startup with Database Initialization ─────────────────
+// ── Asynchronous Server Startup with Database Initialization & Port Fallback ──
+function listenWithFallback(portToTry, isFallback = false) {
+  const server = app.listen(portToTry, '0.0.0.0', () => {
+    console.log(`\n🚀 StreamSmart API running on http://localhost:${portToTry}${isFallback ? ' (In-Memory Fallback Mode)' : ''}`);
+    console.log(`   Health Check: http://localhost:${portToTry}/api/health`);
+    console.log(`   API Index:    http://localhost:${portToTry}/api`);
+    if (!isFallback) {
+      console.log(`   MySQL Database: connected to '${db.DB_CONFIG?.database || 'streamsmart_db'}'\n`);
+    } else {
+      console.log('');
+    }
+  });
+
+  server.on('error', (err) => {
+    if ((err.code === 'EADDRINUSE' || err.code === 'EACCES') && portToTry !== 5002) {
+      console.warn(`⚠️ Port ${portToTry} is unavailable (${err.code}). Retrying on alternative port 5002...`);
+      listenWithFallback(5002, isFallback);
+    } else {
+      console.error(`❌ Server listen error:`, err.message);
+    }
+  });
+  return server;
+}
+
 async function startServer() {
   try {
     console.log('🔄 Initializing database and verifying MySQL connection...');
     await db.initializeAndConnect();
-
-    app.listen(PORT, () => {
-      console.log(`\n🚀 StreamSmart API running on http://localhost:${PORT}`);
-      console.log(`   Health Check: http://localhost:${PORT}/api/health`);
-      console.log(`   API Index:    http://localhost:${PORT}/api`);
-      console.log(`   MySQL Database: connected to '${db.DB_CONFIG.database}'\n`);
-    });
+    listenWithFallback(PORT, false);
   } catch (err) {
-    console.error('\n❌ Fatal: Failed to initialize MySQL database before starting server.');
-    console.error(`   Error: ${err.message}`);
-    console.error('\n   Please verify that:');
-    console.error('   1. MySQL server is running (Services -> MySQL or `net start MySQL`).');
-    console.error('   2. The credentials in .env are correct (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD).');
-    console.error('   3. Run `npm run db:init` to test database setup manually.\n');
-    process.exit(1);
+    console.warn('\n⚠️ Warning: MySQL database unavailable during server startup.');
+    console.warn(`   Error: ${err.message}`);
+    console.warn('   Running with transparent In-Memory Fallback Storage.\n');
+    listenWithFallback(PORT, true);
   }
 }
+
 
 // Start server when executed directly
 if (require.main === module) {

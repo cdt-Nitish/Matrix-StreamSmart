@@ -49,10 +49,19 @@ async function testAll() {
   assert(upshiftBlocked.nextLevel === 1 && upshiftBlocked.reason === 'STEADY_STATE_HOLD',
     'Upshift blocked when next level bitrate exceeds 75% safe bandwidth threshold');
 
-  // Rule 3: Steady state hold between 3.5s and 10.0s
-  const hold = recommendQuality({ currentLevel: 2, bufferSec: 6.0, bandwidthKbps: 4500 });
-  assert(hold.nextLevel === 2 && hold.reason === 'STEADY_STATE_HOLD',
-    'Steady state buffer (6.0s) holds current level 2');
+  // Rule 2: BANDWIDTH_LIMIT immediate downshift when bandwidth plummets
+  // Level 3 = 2800 Kbps. Bandwidth = 850 Kbps, safe = 637.5 Kbps.
+  // Buffer is 7.5s (healthy!). Standard buffer rules would hold, but BANDWIDTH_LIMIT downshifts to level 0 (400k <= 637.5k).
+  const bwDrop = recommendQuality({ currentLevel: 3, bufferSec: 7.5, bandwidthKbps: 850 });
+  assert(bwDrop.nextLevel < 3 && bwDrop.reason === 'BANDWIDTH_LIMIT',
+    `Bandwidth plunge (850k) triggers immediate BANDWIDTH_LIMIT downshift (3 -> ${bwDrop.nextLevel}) even with 7.5s buffer`);
+
+  // Custom ladder & single level boundary test
+  const singleLevelLadder = [{ level: 0, bitrate: 1200000, name: '720p' }];
+  const singleLevelRes = recommendQuality({ currentLevel: 0, bufferSec: 1.0, bandwidthKbps: 500, qualityLadder: singleLevelLadder });
+  assert(singleLevelRes.nextLevel === 0,
+    'Single level stream remains safe at level 0 without index out-of-bounds');
+
 
   // 2. Cache Simulator Tests
   console.log('\n2. LRU Edge Cache Simulator (cacheSimulator.js):');
@@ -143,6 +152,26 @@ async function testAll() {
 
   const sessionDetail = await TestSession.findById(newSession.sessionId);
   assert(sessionDetail !== null, `Retrieved session detail for ID ${newSession.sessionId}`);
+
+  // Test history pagination & search
+  const sessionsList = await TestSession.findAll({ limit: 10, offset: 0 });
+  const totalCount = await TestSession.count();
+  assert(sessionsList.length > 0 && totalCount > 0,
+    `TestSession.findAll returned ${sessionsList.length} sessions (total count: ${totalCount})`);
+
+
+  // Test playback event logging
+  await PlaybackEvent.create({
+    sessionId: newSession.sessionId,
+    playerType: 'OPTIMIZED',
+    eventType: 'QUALITY_SWITCH',
+    playbackTimeSec: 4.5,
+    eventData: { from: 1, to: 2, reason: 'STABLE_BANDWIDTH_UPSHIFT' }
+  });
+  const events = await PlaybackEvent.findBySession(newSession.sessionId);
+  assert(events.length >= 1 && events[0].event_type === 'QUALITY_SWITCH',
+    'PlaybackEvent recorded and retrieved successfully');
+
 
   console.log(`\n========================================`);
   console.log(`Total tests: ${total} | Passed: ${passed} | Failed: ${total - passed}`);
